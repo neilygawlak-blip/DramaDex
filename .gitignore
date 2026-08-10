@@ -1,2 +1,12 @@
-﻿pg10623.txt
+pg10623.txt
 .claude/
+__pycache__/
+
+# Licensed scripts: local only, never committed.
+# Trifles and Monkey's Paw stay tracked because they are public domain.
+private/
+*_raw.txt
+!monkeys_paw_raw.txt
+!monkeys_paw_raw2.txt
+see_how_they_run*
+gods_of_comedy*

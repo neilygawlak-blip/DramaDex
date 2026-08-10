@@ -121,6 +121,7 @@
       <button class="primary" id="pcMic" onclick="listen()">&#127908; Say your line</button>
       <input type="text" id="pcTyped" placeholder="...or type what you'd say and press Enter" style="flex:1;min-width:220px;font-family:inherit"
              onkeydown="if(event.key==='Enter') gradeAttempt(this.value)">
+      <button onclick="readCue()">&#128266; Hear the cue</button>
       <button onclick="revealLine()">Show me the line</button>
       <button onclick="nextCard()">Skip &#9654;</button>
     </div>
@@ -135,6 +136,18 @@
     <label style="display:inline;margin:0;font-size:13px"><input type="checkbox" id="pcHomo" checked> homophones count as right (knot = not)</label>
     <button onclick="saveAppSettings()" style="border-color:var(--accent);color:var(--accent);font-weight:600">Save these settings as the app's current prototype</button>
     <span id="appSettingsInfo" class="hint"></span>
+  </div>
+
+  <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+      <b>Readers</b>
+      <label style="display:inline;margin:0;font-size:13px"><input type="checkbox" id="pcAutoRead" checked onchange="saveCastVoices()"> read my cue out loud</label>
+      <label style="display:inline;margin:0;font-size:13px">speed
+        <input type="range" id="pcRate" min="0.6" max="1.4" step="0.05" value="1" style="vertical-align:middle;width:110px" onchange="saveCastVoices()"></label>
+      <button onclick="stopReading()">Stop</button>
+      <span id="pcVoiceInfo" class="hint"></span>
+    </div>
+    <div id="pcCast" style="display:flex;gap:10px 22px;flex-wrap:wrap"></div>
   </div>
 </div>
 
@@ -1825,16 +1838,121 @@ const CONTRACTIONS = {"i'm":"i am","don't":"do not","can't":"can not","cannot":"
 const HOMO_CANON = {knot:"not",hear:"here",know:"no",two:"to",too:"to",their:"there",
   "they're":"there",your:"you're",whose:"who's",its:"it's"};
 
+/* ---- Readers: cue lines spoken aloud, offline ----------------------------
+   Four slots, two men and two women. Machines ship very few local voices, so
+   where there is no second real voice of a gender the slot reuses the first
+   one shifted in pitch. That is audibly a variation, not a different actor,
+   which is the honest limit until Piper goes in. */
+const READER_SLOTS = [["m1","Man 1"],["m2","Man 2"],["f1","Woman 1"],["f2","Woman 2"]];
+let readerVoice = {}, castVoice = {}, voicesReady = false;
+
+function initVoices(){
+  const all = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+  if(!all.length) return false;
+  /* Local voices only. Chrome also lists Google voices that sound better but
+     go over the network, and picking one would quietly break the offline rule. */
+  let local = all.filter(v => v.localService);
+  const en = local.filter(v => /^en/i.test(v.lang));
+  if(en.length) local = en;
+  if(!local.length) local = all;
+
+  const isMale   = v => /david|mark|guy|george|james|ryan|paul/i.test(v.name);
+  const isFemale = v => /zira|hazel|aria|jenny|michelle|eva|susan|linda/i.test(v.name);
+  const men = local.filter(isMale), women = local.filter(isFemale);
+  const rest = local.filter(v => !isMale(v) && !isFemale(v));
+  const m = men.concat(rest, local), f = women.concat(rest, local);
+
+  readerVoice = {
+    m1: {voice:m[0], pitch:0.95, rate:1.00},
+    m2: {voice:m[1]||m[0], pitch:(m[1]&&m[1]!==m[0])?1.00:0.70, rate:0.93},
+    f1: {voice:f[0], pitch:1.05, rate:1.00},
+    f2: {voice:f[1]||f[0], pitch:(f[1]&&f[1]!==f[0])?1.00:1.40, rate:1.07}
+  };
+  const names = READER_SLOTS.map(([id,label]) =>
+    label+" = "+((readerVoice[id].voice&&readerVoice[id].voice.name)||"none")).join(", ");
+  const info = document.getElementById('pcVoiceInfo');
+  if(info) info.textContent = names;
+  voicesReady = true;
+  return true;
+}
+if(window.speechSynthesis){
+  speechSynthesis.onvoiceschanged = () => { if(!voicesReady && initVoices()) buildCast(); };
+}
+
+function voiceKey(){ return "dexvoices_" + textKey(); }
+
+function saveCastVoices(){
+  const s = {cast:castVoice,
+             auto:document.getElementById('pcAutoRead').checked,
+             rate:+document.getElementById('pcRate').value};
+  localStorage.setItem(voiceKey(), JSON.stringify(s));
+}
+
+function buildCast(){
+  const pane = document.getElementById('pcCast');
+  if(!pane) return;
+  if(!voicesReady && !initVoices()){
+    pane.innerHTML = '<span class="hint">No speech voices available in this browser.</span>';
+    return;
+  }
+  const chars = [...new Set(records.filter(r=>r.kind==="line").map(r=>r.speaker))].filter(Boolean);
+
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(voiceKey())||"null"); } catch(e){}
+  if(saved){
+    castVoice = saved.cast || {};
+    if(typeof saved.auto === "boolean") document.getElementById('pcAutoRead').checked = saved.auto;
+    if(saved.rate) document.getElementById('pcRate').value = saved.rate;
+  }
+  /* Unassigned characters alternate through the four slots, so a fresh script
+     is immediately listenable and you only change the ones that sound wrong. */
+  chars.forEach((c,i)=>{ if(!castVoice[c]) castVoice[c] = READER_SLOTS[i % 4][0]; });
+
+  pane.innerHTML = chars.map(c =>
+    '<label style="display:inline-flex;align-items:center;gap:6px;margin:0;font-size:13px">'
+    + '<span style="min-width:96px">' + escapeHtml(c) + '</span>'
+    + '<select onchange="castVoice[' + JSON.stringify(c).replace(/"/g,'&quot;') + ']=this.value;saveCastVoices()" '
+    + 'style="padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px">'
+    + READER_SLOTS.map(([id,label]) =>
+        '<option value="'+id+'"'+(castVoice[c]===id?' selected':'')+'>'+label+'</option>').join("")
+    + '</select>'
+    + '<button style="padding:2px 8px;font-size:12px" onclick="testVoice(' + JSON.stringify(c).replace(/"/g,'&quot;') + ')">hear</button>'
+    + '</label>').join("");
+  saveCastVoices();
+}
+
+function stopReading(){ if(window.speechSynthesis) speechSynthesis.cancel(); }
+
+function speakAs(who, text){
+  if(!window.speechSynthesis || !text) return;
+  if(!voicesReady && !initVoices()) return;
+  speechSynthesis.cancel();
+  const slot = readerVoice[castVoice[who]] || readerVoice.m1;
+  const u = new SpeechSynthesisUtterance(text);
+  if(slot.voice) u.voice = slot.voice;
+  u.pitch = slot.pitch;
+  u.rate  = slot.rate * (+document.getElementById('pcRate').value || 1);
+  speechSynthesis.speak(u);
+}
+
+function testVoice(who){ speakAs(who, who + " speaking. How now, what's all this then?"); }
+
+function readCue(){
+  const c = pcCards[pcIdx];
+  if(c && c.cue_speaker && c.cue_line) speakAs(c.cue_speaker, c.cue_line);
+}
+
 function togglePractice(){
   const p = document.getElementById('practicePane');
   if(p.style.display==="none"){ p.style.display="block"; buildPractice(); }
-  else p.style.display="none";
+  else { p.style.display="none"; stopReading(); }
 }
 
 function buildPractice(){
   const chars = [...new Set(records.filter(r=>r.kind==="line").map(r=>r.speaker))];
   const sel = document.getElementById('pcChar');
   sel.innerHTML = chars.map(c=>'<option>'+escapeHtml(c)+'</option>').join("");
+  buildCast();
   startPractice();
 }
 
@@ -1854,6 +1972,8 @@ function showCard(){
     : '<i>(this is your first line — no cue before it)</i>';
   document.getElementById('pcResult').innerHTML = "";
   const t = document.getElementById('pcTyped'); t.value=""; t.focus();
+  const auto = document.getElementById('pcAutoRead');
+  if(auto && auto.checked) readCue(); else stopReading();
 }
 
 function nextCard(){ pcIdx = (pcIdx+1) % pcCards.length; showCard(); }
