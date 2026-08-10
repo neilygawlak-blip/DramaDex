@@ -10,11 +10,17 @@ shadow in the fold. If no clear shadow is there, the midpoint is used instead
 and the file is reported so you can check it.
 
 Usage:
-    python split_spreads.py private/spreads private/scans
-    python split_spreads.py private/spreads private/scans --start 12
+    python split_spreads.py private/spreads private/pages
+    python split_spreads.py private/spreads private/pages --start 12
+    python split_spreads.py private/shots  private/pages --single
 
 Output is page_001.jpg upward in reading order, left half then right half.
+
+--single is for one page per photo. Nothing is cut, but the orientation is
+still corrected and the pages are renumbered, so the rest of the pipeline is
+the same either way.
 --start renumbers the output when a batch continues an earlier one.
+--turn / --no-turn override the orientation decision.
 """
 
 import os
@@ -101,6 +107,16 @@ def find_gutter(img):
     return (x if found else w // 2), found
 
 
+def place_single(path, outdir, index, turn):
+    """One photo, one page. Orientation is still fixed, nothing is cut."""
+    img = Image.open(path)
+    if turn:
+        img = img.rotate(90, expand=True)
+    out = os.path.join(outdir, "page_%03d.jpg" % index)
+    img.convert("RGB").save(out, quality=92)
+    return img.size
+
+
 def split_image(path, outdir, index, turn):
     img = Image.open(path)
     if turn:
@@ -123,6 +139,10 @@ def main():
     argv = sys.argv[1:]
     start = 1
     force_turn = None
+    single = False
+    if "--single" in argv:
+        single = True
+        argv.remove("--single")
     if "--turn" in argv:
         force_turn = True
         argv.remove("--turn")
@@ -160,6 +180,14 @@ def main():
 
     index = start
     guessed = []
+    if single:
+        for f in shots:
+            w, h = place_single(os.path.join(src, f), dst, index, turn)
+            print("%-22s -> page_%03d   %dx%d" % (f, index, w, h))
+            index += 1
+        print("\n%d photos -> %d pages in %s" % (len(shots), index - start, dst))
+        return 0
+
     for f in shots:
         path = os.path.join(src, f)
         found, x, w = split_image(path, dst, index, turn)
