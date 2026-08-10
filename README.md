@@ -1,0 +1,47 @@
+# DramaDex (working name)
+
+An all-in-one play rehearsal app. It dissects a script into structured data (characters, dialogue, blocking, props, scenes) and builds tools on top for actors, directors, and stage managers. Core differentiator: graded feedback on spoken lines — the app listens, compares against the script, shows a word diff, and scores forgivingly. No competitor does this (ColdRead, Rehearsal Pro, LineLearner, Script Rehearser were surveyed Aug 2026 — they play cue audio but never judge accuracy).
+
+## Hard constraints (do not violate)
+
+- **No LLM anywhere in the app.** Rule-based parsing, on-device speech recognition, algorithmic scoring, curated content. This is a deliberate product decision (offline, zero per-use cost, publisher-friendly).
+- **Completely offline.** Any ML capability ships as a small on-device module (Tesseract.js for OCR, Vosk/Whisper-tiny WASM candidates for speech, Piper/speechSynthesis for TTS).
+- **Scoring must be forgiving.** Tiers (nailed it / close / not yet), never harsh exact-match. Trust in fair scoring is the product's core asset.
+
+## Current state (Aug 2026)
+
+Everything so far lives in `workbench.html` — a single-file, offline test bench that is also the growing app prototype. Open it by double-clicking, or run `serve_workbench.bat` and open http://localhost:8321/workbench.html (the mic only works via localhost, not file://).
+
+Workbench features working now:
+- Rule-based parser, two script conventions (CAPS-colon like Trifles; "Mr. Name (action)." like Monkey's Paw), auto-detected
+- Per-line records: speaker, cue line/speaker, inline directions, props, hesitations, homophones, monologue difficulty, time-in-play, plus empty interpretive slots (tone, for-why...) humans fill later
+- Filters (by character, by issue type), pin-snapshot diffing (change one knob, changed lines light up orange)
+- Golden answer keys per play with version history (last 2 kept, restore = lossless swap), live accuracy % on every change
+- Practice mode (first real app feature): pick a character, flashcards show your cue, speak (Web Speech API) or type your line, word-diff grading with knobs for thresholds, filler forgiveness, homophone equivalence
+- "Save as app prototype" — persists current knob settings as the app's current design
+
+## Test corpora (both public domain)
+
+- `trifles.txt` — Trifles, Susan Glaspell, 1916. The CLEAN corpus. 149 lines, 5 characters.
+- `monkeys_paw.txt` — The Monkey's Paw, Jacobs/Parker, 1910. The DIRTY corpus: real OCR from a microform scan, deliberately kept imperfect (name misreads like HERSERT/WURTZ, merged paragraphs, boilerplate noise). Raw scans in `monkeys_paw_raw*.txt`.
+
+## Python prototypes (superseded by the workbench, kept for reference)
+
+- `parse_trifles.py` / `parse_trifles_v2.py` — parser prototypes, full-schema output in `trifles_parsed_v2.json`
+- `scene_rollup.py` — aggregation pyramid: per-French-scene stats + rolling tension curves (`trifles_curves.json`); its rule-based climax guess landed on the play's actual climax (dead-canary beat) unaided
+- `clean_monkeys_paw.py` — OCR cleanup: snap-to-cast-list name correction (the app's planned post-correction approach, proven here)
+- `make_trifles_pdf.py` — PDF generation for the reading copies
+
+## Design decisions log (short version)
+
+- Line schema has four layers: parsed (from text), derived (computed), interpretive (humans fill — this IS the group contribution loop), personal (scores, private to each actor)
+- Scene boundaries: headings first, curtain markers/new setting blocks second, whitespace only as confidence booster
+- Props are entities with aliases + presence intervals (preset vs carried-on), not flat keyword hits; acting editions often have a property plot in back matter — parse it as ground truth when present
+- Homophone handling belongs in the scoring comparator, not just cue words ("We call it--knot it" is the canonical case)
+- Alpha plan: concierge import (Chris scans/cleans scripts himself; users never see the messy pipeline), solo practice loop first, group layer later
+- Publisher partnerships (Concord/MTI/Broadway Licensing) planned AFTER a working bring-your-own-script app; on-device processing is the pitch
+- Platform: web-first prototype; iOS native later would swap in Apple Vision/Speech (dev machine is Windows — no Xcode)
+
+## Working style for agents
+
+Chris's standing rule: no yes-manning. Objective assessment in both directions, flag risks proactively, no unearned enthusiasm. Lead with the answer. Plain language. He builds by shipping one genuinely useful basic thing and stacking on it.

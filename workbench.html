@@ -1,0 +1,1948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DramaDex Workbench</title>
+<style>
+  :root { --ink:#222; --muted:#777; --bg:#faf9f6; --card:#fff; --line:#e4e1da;
+          --accent:#6a4fb3; --ok:#1d7a4f; --warn:#b58900; --bad:#b3403a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 "Segoe UI", system-ui, sans-serif; color:var(--ink); background:var(--bg); }
+  header { padding:14px 20px 10px; border-bottom:1px solid var(--line); background:var(--card); }
+  header h1 { margin:0; font-size:20px; font-weight:600; }
+  header p { margin:2px 0 0; color:var(--muted); font-size:13px; }
+  #help { background:#f3effc; border:1px solid #d8cef0; border-radius:8px; margin:12px 20px; padding:12px 16px; font-size:14px; }
+  #help ol { margin:6px 0 4px; padding-left:22px; }
+  #help li { margin:3px 0; }
+  #toolbar { display:flex; gap:10px; align-items:center; padding:10px 20px; flex-wrap:wrap; }
+  button { font:14px "Segoe UI",sans-serif; padding:7px 14px; border:1px solid var(--line);
+           border-radius:7px; background:var(--card); cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  #main { display:grid; grid-template-columns: 1fr 340px; gap:14px; padding:0 20px 20px; }
+  .pane { background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .pane h2 { margin:0; padding:9px 14px; font-size:13px; font-weight:600; letter-spacing:.4px;
+             text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--line); }
+  #script { height:calc(100vh - 240px); overflow-y:auto; padding:10px 14px; }
+  #sidebar { height:calc(100vh - 240px); overflow-y:auto; }
+  #sidebar section { padding:10px 14px; border-bottom:1px solid var(--line); }
+  #sidebar h3 { margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
+  .row { display:block; padding:5px 8px; border-radius:6px; margin:2px 0; cursor:pointer; }
+  .row:hover { outline:2px solid #d8cef0; }
+  .row.sel { outline:2px solid var(--accent); }
+  .row .who { font-weight:700; color:var(--accent); margin-right:6px; }
+  .row .dir { color:var(--muted); font-style:italic; }
+  .row.direction { color:var(--muted); font-style:italic; background:#f5f4f0; }
+  .row.heading { font-weight:700; text-align:center; background:#efeae0; }
+  .row.unsure { background:#fdf3d7; }
+  .row .prop { border-bottom:2px solid #8fce9f; }
+  .badge { display:inline-block; font-size:11px; padding:1px 7px; border-radius:9px; margin-left:6px; vertical-align:1px; }
+  .badge.mono { background:#fde3e1; color:var(--bad); }
+  .badge.homo { background:#fdf0cc; color:var(--warn); }
+  .scorebox { font-size:26px; font-weight:700; }
+  .scorebox small { font-size:12px; font-weight:400; color:var(--muted); display:block; }
+  label { display:block; font-size:13px; margin:10px 0 2px; color:var(--ink); }
+  input[type=range] { width:100%; }
+  textarea, input[type=text] { width:100%; font:13px monospace; border:1px solid var(--line); border-radius:6px; padding:6px; }
+  #detail pre { font:12px/1.5 Consolas, monospace; white-space:pre-wrap; background:#f7f6f2;
+                border-radius:6px; padding:8px; margin:0; max-height:300px; overflow-y:auto; }
+  table.stats { width:100%; font-size:13px; border-collapse:collapse; }
+  table.stats td { padding:2px 4px; border-bottom:1px dotted var(--line); }
+  table.stats td:last-child { text-align:right; color:var(--muted); }
+  .hint { font-size:12px; color:var(--muted); margin:4px 0 0; }
+  #pastebox { display:none; padding:10px 20px; }
+  #pastebox textarea { height:140px; }
+  #filterbar { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 14px;
+               border-bottom:1px solid var(--line); background:#fbfaf7; font-size:13px; }
+  .chip { padding:3px 10px; border:1px solid var(--line); border-radius:12px; cursor:pointer;
+          background:var(--card); font-size:12px; user-select:none; }
+  .chip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .row.dim { opacity:.22; }
+  .row.changed { border-left:4px solid #e08a2e; border-radius:0 6px 6px 0; }
+  #diffinfo { font-size:12px; color:#e08a2e; margin-top:6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>DramaDex Workbench</h1>
+  <p>Feed it a play &rarr; see what the parser understood &rarr; turn the knobs &rarr; watch the score. Nothing leaves this computer.</p>
+</header>
+
+<div id="help">
+  <b>How you use this (3 steps):</b>
+  <ol>
+    <li><b>Load a play.</b> Hit <i>Try the sample play</i> (Trifles is built in), or open any .txt script file.</li>
+    <li><b>Read the middle pane like a marked-up script.</b> <span style="color:var(--accent);font-weight:700">Purple bold</span> = who's speaking. <i style="color:var(--muted)">Gray italic</i> = stage directions. <span style="background:#fdf3d7;padding:0 4px">Yellow</span> = the parser isn't sure. <span style="border-bottom:2px solid #8fce9f">Green underline</span> = a prop it spotted. Click any line to see everything the parser extracted from it.</li>
+    <li><b>Turn knobs on the right, watch the score.</b> When a parse looks fully correct to you, press <i>Save as answer key</i>. From then on, every knob change or new rule shows a live accuracy % against your checked version  - up means better, down means you broke something.</li>
+    <li><b>Zoom in when something looks off.</b> The filter bar above the script isolates one character's lines or one issue type (unsure rows, prop hits, monologues). And <i>Pin snapshot</i> freezes the current parse so that when you change exactly one knob, every line that changed lights up orange — a controlled experiment.</li>
+  </ol>
+  <button onclick="document.getElementById('help').style.display='none'">Got it, hide this</button>
+</div>
+
+<div id="toolbar">
+  <button class="primary" onclick="loadSample()">Load Trifles (clean sample)</button>
+  <button class="primary" style="background:#8a5a2b;border-color:#8a5a2b" onclick="loadSample2()">Load Monkey's Paw (dirty scan)</button>
+  <button onclick="document.getElementById('file').click()">Open a script file (.txt)</button>
+  <input type="file" id="file" accept=".txt" style="display:none" onchange="loadFile(this)">
+  <button onclick="togglePaste()">Paste text instead</button>
+  <button id="practiceBtn" onclick="togglePractice()" style="display:none;border-color:var(--ok);color:var(--ok);font-weight:600">&#9654; Practice mode (flashcards)</button>
+  <span id="loadedName" style="color:var(--muted);font-size:13px"></span>
+</div>
+
+<div id="pastebox">
+  <textarea id="pastetext" placeholder="Paste a play's text here..."></textarea>
+  <button class="primary" style="margin-top:6px" onclick="loadPaste()">Parse pasted text</button>
+</div>
+
+<div id="practicePane" style="display:none;margin:0 20px 14px;background:var(--card);border:2px solid var(--ok);border-radius:10px;padding:14px 18px;">
+  <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+    <b style="color:var(--ok)">Practice: flashcards</b>
+    <label style="display:inline;margin:0">I'm playing:
+      <select id="pcChar" onchange="startPractice()" style="padding:4px 8px;border:1px solid var(--line);border-radius:6px"></select></label>
+    <span id="pcProgress" style="color:var(--muted);font-size:13px"></span>
+    <span style="flex:1"></span>
+    <button onclick="togglePractice()">Close</button>
+  </div>
+  <div id="pcCard" style="background:#f7f6f2;border-radius:8px;padding:14px 16px;">
+    <p class="hint" style="margin:0 0 4px">Your cue:</p>
+    <p id="pcCue" style="margin:0 0 12px;font-size:16px"></p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="primary" id="pcMic" onclick="listen()">&#127908; Say your line</button>
+      <input type="text" id="pcTyped" placeholder="...or type what you'd say and press Enter" style="flex:1;min-width:220px;font-family:inherit"
+             onkeydown="if(event.key==='Enter') gradeAttempt(this.value)">
+      <button onclick="revealLine()">Show me the line</button>
+      <button onclick="nextCard()">Skip &#9654;</button>
+    </div>
+    <div id="pcResult" style="margin-top:12px"></div>
+  </div>
+  <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:12px;align-items:flex-end">
+    <label style="margin:0;min-width:200px">"Nailed it" needs <b id="perfV">90</b>% of the words
+      <input type="range" id="perfT" min="60" max="100" value="90" step="5" oninput="document.getElementById('perfV').textContent=this.value"></label>
+    <label style="margin:0;min-width:200px">"Close enough" needs <b id="closeV">60</b>%
+      <input type="range" id="closeT" min="20" max="90" value="60" step="5" oninput="document.getElementById('closeV').textContent=this.value"></label>
+    <label style="display:inline;margin:0;font-size:13px"><input type="checkbox" id="pcFillers" checked> forgive filler words (uh, um)</label>
+    <label style="display:inline;margin:0;font-size:13px"><input type="checkbox" id="pcHomo" checked> homophones count as right (knot = not)</label>
+    <button onclick="saveAppSettings()" style="border-color:var(--accent);color:var(--accent);font-weight:600">Save these settings as the app's current prototype</button>
+    <span id="appSettingsInfo" class="hint"></span>
+  </div>
+</div>
+
+<div id="main">
+  <div class="pane">
+    <h2>The script, as the parser understood it</h2>
+    <div id="filterbar" style="display:none">
+      <span style="color:var(--muted)">Show:</span>
+      <select id="viewFilter" onchange="applyFilters()" style="padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px">
+        <option value="all">everything</option>
+        <option value="unsure">only unsure (yellow)</option>
+        <option value="props">only lines with props</option>
+        <option value="mono">only monologues</option>
+        <option value="homo">only homophone risks</option>
+        <option value="direction">only stage directions</option>
+      </select>
+      <span id="charChips"></span>
+      <label style="display:inline;font-size:12px;margin:0"><input type="checkbox" id="hideOthers" onchange="applyFilters()"> hide instead of dim</label>
+    </div>
+    <div id="script"><p class="hint" style="padding:20px">Nothing loaded yet  - press "Try the sample play" above.</p></div>
+  </div>
+  <div class="pane" id="sidebar">
+    <section>
+      <h3>Score vs. your answer key</h3>
+      <div class="scorebox" id="score">-<small>No answer key saved for this play yet. When the parse looks right, save one.</small></div>
+      <button id="saveGold" onclick="saveGolden()" style="margin-top:8px">Save current parse as answer key</button>
+      <button id="restoreGold" onclick="restoreGolden()" style="margin-top:6px;display:none">Restore previous answer key</button>
+      <p class="hint" id="goldInfo"></p>
+      <div style="margin-top:10px;padding-top:8px;border-top:1px dotted var(--line)">
+        <b style="font-size:13px">Isolate one variable</b>
+        <p class="hint" style="margin:2px 0 6px">Pin the current parse, change exactly one knob, and every line whose result changed lights up orange.</p>
+        <button onclick="pinSnapshot()">Pin snapshot</button>
+        <button onclick="clearSnapshot()">Clear</button>
+        <div id="diffinfo"></div>
+      </div>
+    </section>
+    <section>
+      <h3>Knobs</h3>
+      <label>Long-monologue flag: lines over <b id="monoV">120</b> words
+        <input type="range" id="mono" min="40" max="300" value="120" step="10" oninput="reparse()"></label>
+      <label>Speaker style
+        <select id="convention" onchange="reparse()" style="width:100%;padding:5px;border:1px solid var(--line);border-radius:6px">
+          <option value="auto">Auto-detect</option>
+          <option value="caps">ALL CAPS with colon (Trifles style)</option>
+          <option value="mixed">Mr. Name (action). style (Monkey's Paw)</option>
+        </select></label>
+      <label>Prop words the parser looks for (comma-separated)
+        <textarea id="props" rows="3" oninput="reparse()">bread, towel, pans, rocker, preserves, jar, quilt, bird-cage, cage, bird, canary, box, apron, shawl, bottle, loaf, basket, rope, stove, scissors, paw, kettle, chess, candle, lamp, piano, letter, envelope, money, coat, duster</textarea></label>
+      <label>Hesitation / interruption marker
+        <input type="text" id="dash" value="--" oninput="reparse()"></label>
+    </section>
+    <section>
+      <h3>What the parser found</h3>
+      <div id="stats"><p class="hint">Load a play first.</p></div>
+    </section>
+    <section id="detail">
+      <h3>Line details <span class="hint">(click a line in the script)</span></h3>
+      <pre id="detailJson">-</pre>
+    </section>
+  </div>
+</div>
+
+<script id="sampleText" type="text/plain">TRIFLES
+
+
+First performed by the Provincetown Players at the Wharf Theatre,
+Provincetown, Mass., August 8, 1916.
+
+
+GEORGE HENDERSON (County Attorney)
+
+HENRY PETERS (Sheriff)
+
+LEWIS HALE, A neighboring farmer
+
+MRS PETERS
+
+MRS HALE
+
+
+SCENE: _The kitchen is the now abandoned farmhouse of_ JOHN WRIGHT, _a
+gloomy kitchen, and left without having been put in order--unwashed pans
+under the sink, a loaf of bread outside the bread-box, a dish-towel on
+the table--other signs of incompleted work. At the rear the outer door
+opens and the_ SHERIFF _comes in followed by the_ COUNTY ATTORNEY _and_
+HALE. _The_ SHERIFF _and_ HALE _are men in middle life, the_ COUNTY
+ATTORNEY _is a young man; all are much bundled up and go at once to the
+stove. They are followed by the two women--the_ SHERIFF_'s wife first;
+she is a slight wiry woman, a thin nervous face_. MRS HALE _is larger
+and would ordinarily be called more comfortable looking, but she is
+disturbed now and looks fearfully about as she enters. The women have
+come in slowly, and stand close together near the door_.
+
+COUNTY ATTORNEY: (_rubbing his hands_) This feels good. Come up to the
+fire, ladies.
+
+MRS PETERS: (_after taking a step forward_) I'm not--cold.
+
+SHERIFF: (_unbuttoning his overcoat and stepping away from the stove as
+if to mark the beginning of official business_) Now, Mr Hale, before we
+move things about, you explain to Mr Henderson just what you saw when
+you came here yesterday morning.
+
+COUNTY ATTORNEY: By the way, has anything been moved? Are things just as
+you left them yesterday?
+
+SHERIFF: (_looking about_) It's just the same. When it dropped below
+zero last night I thought I'd better send Frank out this morning to make
+a fire for us--no use getting pneumonia with a big case on, but I told
+him not to touch anything except the stove--and you know Frank.
+
+COUNTY ATTORNEY: Somebody should have been left here yesterday.
+
+SHERIFF: Oh--yesterday. When I had to send Frank to Morris Center for
+that man who went crazy--I want you to know I had my hands full
+yesterday. I knew you could get back from Omaha by today and as long as
+I went over everything here myself--
+
+COUNTY ATTORNEY: Well, Mr Hale, tell just what happened when you came
+here yesterday morning.
+
+HALE: Harry and I had started to town with a load of potatoes. We came
+along the road from my place and as I got here I said, I'm going to see
+if I can't get John Wright to go in with me on a party telephone.' I
+spoke to Wright about it once before and he put me off, saying folks
+talked too much anyway, and all he asked was peace and quiet--I guess
+you know about how much he talked himself; but I thought maybe if I went
+to the house and talked about it before his wife, though I said to Harry
+that I didn't know as what his wife wanted made much difference to
+John--
+
+COUNTY ATTORNEY: Let's talk about that later, Mr Hale. I do want to talk
+about that, but tell now just what happened when you got to the house.
+
+HALE: I didn't hear or see anything; I knocked at the door, and still it
+was all quiet inside. I knew they must be up, it was past eight o'clock.
+So I knocked again, and I thought I heard somebody say, 'Come in.' I
+wasn't sure, I'm not sure yet, but I opened the door--this door
+(_indicating the door by which the two women are still standing_) and
+there in that rocker--(_pointing to it_) sat Mrs Wright.
+
+(_They all look at the rocker_.)
+
+COUNTY ATTORNEY: What--was she doing?
+
+HALE: She was rockin' back and forth. She had her apron in her hand and
+was kind of--pleating it.
+
+COUNTY ATTORNEY: And how did she--look?
+
+HALE: Well, she looked queer.
+
+COUNTY ATTORNEY: How do you mean--queer?
+
+HALE: Well, as if she didn't know what she was going to do next. And
+kind of done up.
+
+COUNTY ATTORNEY: How did she seem to feel about your coming?
+
+HALE: Why, I don't think she minded--one way or other. She didn't pay
+much attention. I said, 'How do, Mrs Wright it's cold, ain't it?' And
+she said, 'Is it?'--and went on kind of pleating at her apron. Well, I
+was surprised; she didn't ask me to come up to the stove, or to set
+down, but just sat there, not even looking at me, so I said, 'I want to
+see John.' And then she--laughed. I guess you would call it a laugh. I
+thought of Harry and the team outside, so I said a little sharp: 'Can't
+I see John?' 'No', she says, kind o' dull like. 'Ain't he home?' says I.
+'Yes', says she, 'he's home'. 'Then why can't I see him?' I asked her,
+out of patience. ''Cause he's dead', says she. _'Dead_?' says I. She
+just nodded her head, not getting a bit excited, but rockin' back and
+forth. 'Why--where is he?' says I, not knowing what to say. She just
+pointed upstairs--like that (_himself pointing to the room above_) I got
+up, with the idea of going up there. I walked from there to here--then I
+says, 'Why, what did he die of?' 'He died of a rope round his neck',
+says she, and just went on pleatin' at her apron. Well, I went out and
+called Harry. I thought I might--need help. We went upstairs and there
+he was lyin'--
+
+COUNTY ATTORNEY: I think I'd rather have you go into that upstairs,
+where you can point it all out. Just go on now with the rest of the
+story.
+
+HALE: Well, my first thought was to get that rope off. It looked ...
+(_stops, his face twitches_) ... but Harry, he went up to him, and he
+said, 'No, he's dead all right, and we'd better not touch anything.' So
+we went back down stairs. She was still sitting that same way. 'Has
+anybody been notified?' I asked. 'No', says she unconcerned. 'Who did
+this, Mrs Wright?' said Harry. He said it business-like--and she stopped
+pleatin' of her apron. 'I don't know', she says. 'You don't _know_?'
+says Harry. 'No', says she. 'Weren't you sleepin' in the bed with him?'
+says Harry. 'Yes', says she, 'but I was on the inside'. 'Somebody
+slipped a rope round his neck and strangled him and you didn't wake up?'
+says Harry. 'I didn't wake up', she said after him. We must 'a looked as
+if we didn't see how that could be, for after a minute she said, 'I
+sleep sound'. Harry was going to ask her more questions but I said maybe
+we ought to let her tell her story first to the coroner, or the sheriff,
+so Harry went fast as he could to Rivers' place, where there's a
+telephone.
+
+COUNTY ATTORNEY: And what did Mrs Wright do when she knew that you had
+gone for the coroner?
+
+HALE: She moved from that chair to this one over here (_pointing to a
+small chair in the corner_) and just sat there with her hands held
+together and looking down. I got a feeling that I ought to make some
+conversation, so I said I had come in to see if John wanted to put in a
+telephone, and at that she started to laugh, and then she stopped and
+looked at me--scared, (_the_ COUNTY ATTORNEY, _who has had his notebook
+out, makes a note_) I dunno, maybe it wasn't scared. I wouldn't like to
+say it was. Soon Harry got back, and then Dr Lloyd came, and you, Mr
+Peters, and so I guess that's all I know that you don't.
+
+COUNTY ATTORNEY: (_looking around_) I guess we'll go upstairs first--and
+then out to the barn and around there, (_to the_ SHERIFF) You're
+convinced that there was nothing important here--nothing that would
+point to any motive.
+
+SHERIFF: Nothing here but kitchen things.
+
+(_The_ COUNTY ATTORNEY, _after again looking around the kitchen, opens
+the door of a cupboard closet. He gets up on a chair and looks on a
+shelf. Pulls his hand away, sticky_.)
+
+COUNTY ATTORNEY: Here's a nice mess.
+
+(_The women draw nearer_.)
+
+MRS PETERS: (_to the other woman_) Oh, her fruit; it did freeze, (_to
+the_ LAWYER) She worried about that when it turned so cold. She said the
+fire'd go out and her jars would break.
+
+SHERIFF: Well, can you beat the women! Held for murder and worryin'
+about her preserves.
+
+COUNTY ATTORNEY: I guess before we're through she may have something
+more serious than preserves to worry about.
+
+HALE: Well, women are used to worrying over trifles.
+
+(_The two women move a little closer together_.)
+
+COUNTY ATTORNEY: (_with the gallantry of a young politician_) And yet,
+for all their worries, what would we do without the ladies? (_the women
+do not unbend. He goes to the sink, takes a dipperful of water from the
+pail and pouring it into a basin, washes his hands. Starts to wipe them
+on the roller-towel, turns it for a cleaner place_) Dirty towels!
+(_kicks his foot against the pans under the sink_) Not much of a
+housekeeper, would you say, ladies?
+
+MRS HALE: (_stiffly_) There's a great deal of work to be done on a farm.
+
+COUNTY ATTORNEY: To be sure. And yet (_with a little bow to her_) I know
+there are some Dickson county farmhouses which do not have such roller
+towels. (_He gives it a pull to expose its length again_.)
+
+MRS HALE: Those towels get dirty awful quick. Men's hands aren't always
+as clean as they might be.
+
+COUNTY ATTORNEY: Ah, loyal to your sex, I see. But you and Mrs Wright
+were neighbors. I suppose you were friends, too.
+
+MRS HALE: (_shaking her head_) I've not seen much of her of late years.
+I've not been in this house--it's more than a year.
+
+COUNTY ATTORNEY: And why was that? You didn't like her?
+
+MRS HALE: I liked her all well enough. Farmers' wives have their hands
+full, Mr Henderson. And then--
+
+COUNTY ATTORNEY: Yes--?
+
+MRS HALE: (_looking about_) It never seemed a very cheerful place.
+
+COUNTY ATTORNEY: No--it's not cheerful. I shouldn't say she had the
+homemaking instinct.
+
+MRS HALE: Well, I don't know as Wright had, either.
+
+COUNTY ATTORNEY: You mean that they didn't get on very well?
+
+MRS HALE: No, I don't mean anything. But I don't think a place'd be any
+cheerfuller for John Wright's being in it.
+
+COUNTY ATTORNEY: I'd like to talk more of that a little later. I want to
+get the lay of things upstairs now. (_He goes to the left, where three
+steps lead to a stair door_.)
+
+SHERIFF: I suppose anything Mrs Peters does'll be all right. She was to
+take in some clothes for her, you know, and a few little things. We left
+in such a hurry yesterday.
+
+COUNTY ATTORNEY: Yes, but I would like to see what you take, Mrs Peters,
+and keep an eye out for anything that might be of use to us.
+
+MRS PETERS: Yes, Mr Henderson.
+
+(_The women listen to the men's steps on the stairs, then look about the
+kitchen_.)
+
+MRS HALE: I'd hate to have men coming into my kitchen, snooping around
+and criticising.
+
+(_She arranges the pans under sink which the_ LAWYER _had shoved out of
+place_.)
+
+MRS PETERS: Of course it's no more than their duty.
+
+MRS HALE: Duty's all right, but I guess that deputy sheriff that came
+out to make the fire might have got a little of this on. (_gives the
+roller towel a pull_) Wish I'd thought of that sooner. Seems mean to
+talk about her for not having things slicked up when she had to come
+away in such a hurry.
+
+MRS PETERS: (_who has gone to a small table in the left rear corner of
+the room, and lifted one end of a towel that covers a pan_) She had
+bread set. (_Stands still_.)
+
+MRS HALE: (_eyes fixed on a loaf of bread beside the bread-box, which is
+on a low shelf at the other side of the room. Moves slowly toward it_)
+She was going to put this in there, (_picks up loaf, then abruptly drops
+it. In a manner of returning to familiar things_) It's a shame about her
+fruit. I wonder if it's all gone. (_gets up on the chair and looks_) I
+think there's some here that's all right, Mrs Peters. Yes--here;
+(_holding it toward the window_) this is cherries, too. (_looking
+again_) I declare I believe that's the only one. (_gets down, bottle in
+her hand. Goes to the sink and wipes it off on the outside_) She'll feel
+awful bad after all her hard work in the hot weather. I remember the
+afternoon I put up my cherries last summer.
+
+(_She puts the bottle on the big kitchen table, center of the room. With
+a sigh, is about to sit down in the rocking-chair. Before she is seated
+realizes what chair it is; with a slow look at it, steps back. The chair
+which she has touched rocks back and forth_.)
+
+MRS PETERS: Well, I must get those things from the front room closet,
+(_she goes to the door at the right, but after looking into the other
+room, steps back_) You coming with me, Mrs Hale? You could help me carry
+them.
+
+(_They go in the other room; reappear,_ MRS PETERS _carrying a dress and
+skirt,_ MRS HALE _following with a pair of shoes._)
+
+MRS PETERS: My, it's cold in there.
+
+(_She puts the clothes on the big table, and hurries to the stove._)
+
+MRS HALE: (_examining the skirt_) Wright was close. I think maybe that's
+why she kept so much to herself. She didn't even belong to the Ladies
+Aid. I suppose she felt she couldn't do her part, and then you don't
+enjoy things when you feel shabby. She used to wear pretty clothes and
+be lively, when she was Minnie Foster, one of the town girls singing in
+the choir. But that--oh, that was thirty years ago. This all you was to
+take in?
+
+MRS PETERS: She said she wanted an apron. Funny thing to want, for there
+isn't much to get you dirty in jail, goodness knows. But I suppose just
+to make her feel more natural. She said they was in the top drawer in
+this cupboard. Yes, here. And then her little shawl that always hung
+behind the door. (_opens stair door and looks_) Yes, here it is.
+
+(_Quickly shuts door leading upstairs._)
+
+MRS HALE: (_abruptly moving toward her_) Mrs Peters?
+
+MRS PETERS: Yes, Mrs Hale?
+
+MRS HALE: Do you think she did it?
+
+MRS PETERS: (_in a frightened voice_) Oh, I don't know.
+
+MRS HALE: Well, I don't think she did. Asking for an apron and her
+little shawl. Worrying about her fruit.
+
+MRS PETERS: (_starts to speak, glances up, where footsteps are heard in
+the room above. In a low voice_) Mr Peters says it looks bad for her. Mr
+Henderson is awful sarcastic in a speech and he'll make fun of her
+sayin' she didn't wake up.
+
+MRS HALE: Well, I guess John Wright didn't wake when they was slipping
+that rope under his neck.
+
+MRS PETERS: No, it's strange. It must have been done awful crafty and
+still. They say it was such a--funny way to kill a man, rigging it all
+up like that.
+
+MRS HALE: That's just what Mr Hale said. There was a gun in the house.
+He says that's what he can't understand.
+
+MRS PETERS: Mr Henderson said coming out that what was needed for the
+case was a motive; something to show anger, or--sudden feeling.
+
+MRS HALE: (_who is standing by the table_) Well, I don't see any signs
+of anger around here, (_she puts her hand on the dish towel which lies
+on the table, stands looking down at table, one half of which is clean,
+the other half messy_) It's wiped to here, (_makes a move as if to
+finish work, then turns and looks at loaf of bread outside the breadbox.
+Drops towel. In that voice of coming back to familiar things._) Wonder
+how they are finding things upstairs. I hope she had it a little more
+red-up up there. You know, it seems kind of sneaking. Locking her up in
+town and then coming out here and trying to get her own house to turn
+against her!
+
+MRS PETERS: But Mrs Hale, the law is the law.
+
+MRS HALE: I s'pose 'tis, (_unbuttoning her coat_) Better loosen up your
+things, Mrs Peters. You won't feel them when you go out.
+
+(MRS PETERS _takes off her fur tippet, goes to hang it on hook at back
+of room, stands looking at the under part of the small corner table_.)
+
+MRS PETERS: She was piecing a quilt. (_She brings the large sewing
+basket and they look at the bright pieces_.)
+
+MRS HALE: It's log cabin pattern. Pretty, isn't it? I wonder if she was
+goin' to quilt it or just knot it?
+
+(_Footsteps have been heard coming down the stairs_. The SHERIFF enters
+followed by HALE and the COUNTY ATTORNEY.)
+
+SHERIFF: They wonder if she was going to quilt it or just knot it! (_The
+men laugh, the women look abashed_.)
+
+COUNTY ATTORNEY: (_rubbing his hands over the stove_) Frank's fire
+didn't do much up there, did it? Well, let's go out to the barn and get
+that cleared up. (_The men go outside_.)
+
+MRS HALE: (_resentfully_) I don't know as there's anything so strange,
+our takin' up our time with little things while we're waiting for them
+to get the evidence. (_she sits down at the big table smoothing out a
+block with decision_) I don't see as it's anything to laugh about.
+
+MRS PETERS: (_apologetically_) Of course they've got awful important
+things on their minds.
+
+(_Pulls up a chair and joins MRS HALE at the table_.)
+
+MRS HALE: (_examining another block_) Mrs Peters, look at this one.
+Here, this is the one she was working on, and look at the sewing! All
+the rest of it has been so nice and even. And look at this! It's all
+over the place! Why, it looks as if she didn't know what she was about!
+
+(_After she has said this they look at each other, then start to glance
+back at the door. After an instant_ MRS HALE _has pulled at a knot and
+ripped the sewing_.)
+
+MRS PETERS: Oh, what are you doing, Mrs Hale?
+
+MRS HALE: (_mildly_) Just pulling out a stitch or two that's not sewed
+very good. (_threading a needle_) Bad sewing always made me fidgety.
+
+MRS PETERS: (nervously) I don't think we ought to touch things.
+
+MRS HALE: I'll just finish up this end. (_suddenly stopping and leaning
+forward_) Mrs Peters?
+
+MRS PETERS: Yes, Mrs Hale?
+
+MRS HALE: What do you suppose she was so nervous about?
+
+MRS PETERS: Oh--I don't know. I don't know as she was nervous. I
+sometimes sew awful queer when I'm just tired. (MRS HALE _starts to say
+something, looks at_ MRS PETERS, _then goes on sewing_) Well I must get
+these things wrapped up. They may be through sooner than we think,
+(_putting apron and other things together_) I wonder where I can find a
+piece of paper, and string.
+
+MRS HALE: In that cupboard, maybe.
+
+MRS PETERS: (_looking in cupboard_) Why, here's a bird-cage, (_holds it
+up_) Did she have a bird, Mrs Hale?
+
+MRS HALE: Why, I don't know whether she did or not--I've not been here
+for so long. There was a man around last year selling canaries cheap,
+but I don't know as she took one; maybe she did. She used to sing real
+pretty herself.
+
+MRS PETERS: (_glancing around_) Seems funny to think of a bird here. But
+she must have had one, or why would she have a cage? I wonder what
+happened to it.
+
+MRS HALE: I s'pose maybe the cat got it.
+
+MRS PETERS: No, she didn't have a cat. She's got that feeling some
+people have about cats--being afraid of them. My cat got in her room and
+she was real upset and asked me to take it out.
+
+MRS HALE: My sister Bessie was like that. Queer, ain't it?
+
+MRS PETERS: (_examining the cage_) Why, look at this door. It's broke.
+One hinge is pulled apart.
+
+MRS HALE: (_looking too_) Looks as if someone must have been rough with
+it.
+
+MRS PETERS: Why, yes.
+
+(_She brings the cage forward and puts it on the table_.)
+
+MRS HALE: I wish if they're going to find any evidence they'd be about
+it. I don't like this place.
+
+MRS PETERS: But I'm awful glad you came with me, Mrs Hale. It would be
+lonesome for me sitting here alone.
+
+MRS HALE: It would, wouldn't it? (_dropping her sewing_) But I tell you
+what I do wish, Mrs Peters. I wish I had come over sometimes when _she_
+was here. I--(_looking around the room_)--wish I had.
+
+MRS PETERS: But of course you were awful busy, Mrs Hale--your house and
+your children.
+
+MRS HALE: I could've come. I stayed away because it weren't
+cheerful--and that's why I ought to have come. I--I've never liked this
+place. Maybe because it's down in a hollow and you don't see the road. I
+dunno what it is, but it's a lonesome place and always was. I wish I had
+come over to see Minnie Foster sometimes. I can see now--(_shakes her
+head_)
+
+MRS PETERS: Well, you mustn't reproach yourself, Mrs Hale. Somehow we
+just don't see how it is with other folks until--something comes up.
+
+MRS HALE: Not having children makes less work--but it makes a quiet
+house, and Wright out to work all day, and no company when he did come
+in. Did you know John Wright, Mrs Peters?
+
+MRS PETERS: Not to know him; I've seen him in town. They say he was a
+good man.
+
+MRS HALE: Yes--good; he didn't drink, and kept his word as well as most,
+I guess, and paid his debts. But he was a hard man, Mrs Peters. Just to
+pass the time of day with him--(_shivers_) Like a raw wind that gets to
+the bone, (_pauses, her eye falling on the cage_) I should think she
+would 'a wanted a bird. But what do you suppose went with it?
+
+MRS PETERS: I don't know, unless it got sick and died.
+
+(_She reaches over and swings the broken door, swings it again, both
+women watch it_.)
+
+MRS HALE: You weren't raised round here, were you? (_MRS PETERS shakes
+her head_) You didn't know--her?
+
+MRS PETERS: Not till they brought her yesterday.
+
+MRS HALE: She--come to think of it, she was kind of like a bird
+herself--real sweet and pretty, but kind of timid and--fluttery.
+How--she--did--change. (_silence; then as if struck by a happy thought
+and relieved to get back to everyday things_) Tell you what, Mrs Peters,
+why don't you take the quilt in with you? It might take up her mind.
+
+MRS PETERS: Why, I think that's a real nice idea, Mrs Hale. There
+couldn't possibly be any objection to it, could there? Now, just what
+would I take? I wonder if her patches are in here--and her things.
+
+(_They look in the sewing basket_.)
+
+MRS HALE: Here's some red. I expect this has got sewing things in it.
+(_brings out a fancy box_) What a pretty box. Looks like something
+somebody would give you. Maybe her scissors are in here. (_Opens box.
+Suddenly puts her hand to her nose_) Why--(MRS PETERS _bends nearer,
+then turns her face away_) There's something wrapped up in this piece of
+silk.
+
+MRS PETERS: Why, this isn't her scissors.
+
+MRS HALE: (_lifting the silk_) Oh, Mrs Peters--it's--
+
+(MRS PETERS _bends closer_.)
+
+MRS PETERS: It's the bird.
+
+MRS HALE: (_jumping up_) But, Mrs Peters--look at it! It's neck! Look at
+its neck!
+
+It's all--other side _to_.
+
+MRS PETERS: Somebody--wrung--its--neck.
+
+(_Their eyes meet. A look of growing comprehension, of horror. Steps are
+heard outside_. MRS HALE _slips box under quilt pieces, and sinks into
+her chair. Enter_ SHERIFF _and_ COUNTY ATTORNEY. MRS PETERS _rises_.)
+
+COUNTY ATTORNEY: (_as one turning from serious things to little
+pleasantries_) Well ladies, have you decided whether she was going to
+quilt it or knot it?
+
+MRS PETERS: We think she was going to--knot it.
+
+COUNTY ATTORNEY: Well, that's interesting, I'm sure. (_seeing the
+birdcage_) Has the bird flown?
+
+MRS HALE: (_putting more quilt pieces over the box_) We think the--cat
+got it.
+
+COUNTY ATTORNEY: (_preoccupied_) Is there a cat?
+
+(MRS HALE _glances in a quick covert way at_ MRS PETERS.)
+
+MRS PETERS: Well, not now. They're superstitious, you know. They leave.
+
+COUNTY ATTORNEY: (_to_ SHERIFF PETERS, _continuing an interrupted
+conversation_) No sign at all of anyone having come from the outside.
+Their own rope. Now let's go up again and go over it piece by piece.
+(_they start upstairs_) It would have to have been someone who knew just
+the--
+
+(MRS PETERS _sits down. The two women sit there not looking at one
+another, but as if peering into something and at the same time holding
+back. When they talk now it is in the manner of feeling their way over
+strange ground, as if afraid of what they are saying, but as if they can
+not help saying it_.)
+
+MRS HALE: She liked the bird. She was going to bury it in that pretty
+box.
+
+MRS PETERS: (_in a whisper_) When I was a girl--my kitten--there was a
+boy took a hatchet, and before my eyes--and before I could get
+there--(_covers her face an instant_) If they hadn't held me back I
+would have--(_catches herself, looks upstairs where steps are heard,
+falters weakly_)--hurt him.
+
+MRS HALE: (_with a slow look around her_) I wonder how it would seem
+never to have had any children around, (_pause_) No, Wright wouldn't
+like the bird--a thing that sang. She used to sing. He killed that, too.
+
+MRS PETERS: (_moving uneasily_) We don't know who killed the bird.
+
+MRS HALE: I knew John Wright.
+
+MRS PETERS: It was an awful thing was done in this house that night, Mrs
+Hale. Killing a man while he slept, slipping a rope around his neck that
+choked the life out of him.
+
+MRS HALE: His neck. Choked the life out of him.
+
+(_Her hand goes out and rests on the bird-cage_.)
+
+MRS PETERS: (_with rising voice_) We don't know who killed him. We don't
+_know_.
+
+MRS HALE: (_her own feeling not interrupted_) If there'd been years and
+years of nothing, then a bird to sing to you, it would be awful--still,
+after the bird was still.
+
+MRS PETERS: (_something within her speaking_) I know what stillness is.
+When we homesteaded in Dakota, and my first baby died--after he was two
+years old, and me with no other then--
+
+MRS HALE: (_moving_) How soon do you suppose they'll be through, looking
+for the evidence?
+
+MRS PETERS: I know what stillness is. (_pulling herself back_) The law
+has got to punish crime, Mrs Hale.
+
+MRS HALE: (_not as if answering that_) I wish you'd seen Minnie Foster
+when she wore a white dress with blue ribbons and stood up there in the
+choir and sang. (_a look around the room_) Oh, I _wish_ I'd come over
+here once in a while! That was a crime! That was a crime! Who's going to
+punish that?
+
+MRS PETERS: (_looking upstairs_) We mustn't--take on.
+
+MRS HALE: I might have known she needed help! I know how things can
+be--for women. I tell you, it's queer, Mrs Peters. We live close
+together and we live far apart. We all go through the same things--it's
+all just a different kind of the same thing, (_brushes her eyes,
+noticing the bottle of fruit, reaches out for it_) If I was you, I
+wouldn't tell her her fruit was gone. Tell her it _ain't_. Tell her it's
+all right. Take this in to prove it to her. She--she may never know
+whether it was broke or not.
+
+MRS PETERS: (_takes the bottle, looks about for something to wrap it in;
+takes petticoat from the clothes brought from the other room, very
+nervously begins winding this around the bottle. In a false voice_) My,
+it's a good thing the men couldn't hear us. Wouldn't they just laugh!
+Getting all stirred up over a little thing like a--dead canary. As if
+that could have anything to do with--with--wouldn't they _laugh_!
+
+(_The men are heard coming down stairs_.)
+
+MRS HALE: (_under her breath_) Maybe they would--maybe they wouldn't.
+
+COUNTY ATTORNEY: No, Peters, it's all perfectly clear except a reason
+for doing it. But you know juries when it comes to women. If there was
+some definite thing. Something to show--something to make a story
+about--a thing that would connect up with this strange way of doing it--
+
+(_The women's eyes meet for an instant. Enter HALE from outer door_.)
+
+HALE: Well, I've got the team around. Pretty cold out there.
+
+COUNTY ATTORNEY: I'm going to stay here a while by myself, (_to the_
+SHERIFF) You can send Frank out for me, can't you? I want to go over
+everything. I'm not satisfied that we can't do better.
+
+SHERIFF: Do you want to see what Mrs Peters is going to take in?
+
+(_The_ LAWYER _goes to the table, picks up the apron, laughs_.)
+
+COUNTY ATTORNEY: Oh, I guess they're not very dangerous things the
+ladies have picked out. (_Moves a few things about, disturbing the quilt
+pieces which cover the box. Steps back_) No, Mrs Peters doesn't need
+supervising. For that matter, a sheriff's wife is married to the law.
+Ever think of it that way, Mrs Peters?
+
+MRS PETERS: Not--just that way.
+
+SHERIFF: (_chuckling_) Married to the law. (_moves toward the other
+room_) I just want you to come in here a minute, George. We ought to
+take a look at these windows.
+
+COUNTY ATTORNEY: (_scoffingly_) Oh, windows!
+
+SHERIFF: We'll be right out, Mr Hale.
+
+(HALE _goes outside. The_ SHERIFF _follows the_ COUNTY ATTORNEY _into
+the other room. Then_ MRS HALE _rises, hands tight together, looking
+intensely at_ MRS PETERS, _whose eyes make a slow turn, finally meeting_
+MRS HALE_'s. A moment_ MRS HALE _holds her, then her own eyes point the
+way to where the box is concealed. Suddenly_ MRS PETERS _throws back
+quilt pieces and tries to put the box in the bag she is wearing. It is
+too big. She opens box, starts to take bird out, cannot touch it, goes
+to pieces, stands there helpless. Sound of a knob turning in the other
+room_. MRS HALE _snatches the box and puts it in the pocket of her big
+coat. Enter_ COUNTY ATTORNEY _and_ SHERIFF.)
+
+COUNTY ATTORNEY: (_facetiously_) Well, Henry, at least we found out that
+she was not going to quilt it. She was going to--what is it you call it,
+ladies?
+
+MRS HALE: (_her hand against her pocket_) We call it--knot it, Mr
+Henderson.
+
+
+(CURTAIN)
+</script>
+
+<script id="sampleText2" type="text/plain">Produced at the Haymarket Theatre, London, on Octo- ber 6th, 1903, with the following cast: Mr. WHITE e ° . . Mr. Cyril Maude. Mxs. WHITE ° F Misa Lena Ashwell, HERBERT. : . Mr. Wilfred Forster. SERGEANT-Majgor Morris Mr. Sydney Valentine, Mr. SaMPsoN , e Mr. Rudge Harding.
+
+All applications for 9 licence to perform this Play—both by professional and amateur companies—must be addressed ated
+
+Messrs. Samuel French, L4., 26 Southampton Street, Strand, London, W.C.2, or their authorized agents.
+
+The fee for each and every representation by amateurs is Two Guineas, which is payable in advance,
+
+Upon payment of the fee a licence will be issued for the Performance to take place,
+
+No performance may be given unless this liconce has been obtained.
+
+The following Particulars are needed for the issue of a licence :
+
+Title of the play(s).
+
+Name of the town,
+
+Name of the theatre or hall, Date of the rformance(s), Name and address of applicant, Name of the Society,
+
+Amount remitted.
+
+Terms for Performance by professional companies will be quoted upon application,
+
+Character costumes and wigs used in the performance of plays contained in French's Acting Edition may be obtained
+
+from Messrs. CHARLEs H, Fox, Ltd., 184 High Holborn, London, W.C.:,
+
+SCENE I
+
+Scznz.—The living-room of an old-fashioned cottage on the outskirts of Fulham.
+
+Set corner-wis in the left angle at the back is a deep window ; rther front, L., three or four steps lead up toa or. Farther forward is a dresser, with plates, glusses, etc. B.0. at back \: 4m alcove with the street door fully visible. On '\- neside of
+
+* the street door is a wire letter-box. CG .ue R. i8 @ cupboard, then a fireplace. In the 0. is a round table. Against the wall, u. back, is an old-fashioned piano. A comfortable armchair is on each side of the fireplace. There are other chairs. On the mantel- piece are @ clock, ola china figures, etc. An air of comfort pervades the room.
+
+At the rise of the Curtarx, Mrs, Wars, a pleasant- looking old woman, is seated in the armchair below the fire, attending to a kettle which is steaming on the fire, and keeping a laughing eye on Mr. White and Hersrt. These tu are seated at the R. angle of the table ».earest the 2 with a chess-board between them. Mr. White: 'vidently losing. His hair is ruffled ; his spectucles are high up on his forehead. HERBERT, @ fixe young fellow, is looking with satixicction a: the move he has just made. Mr. WI :.i makea several attempts to move, but thinks
+
+better of them. There is a shaded lamp on the table.
+
+_ The door is tightly shut. 'The curtains of the window
+
+are drawn ; but every now and then the wind is
+
+heard whisthng outside.
+
+Mr. WHITE (moving at last' and triumphant). There, Herbert, my boy! Got you, I think. HERBERT. Oh, you're a deep 'un, Dad, aren't you ?
+
+j i $
+
+6 THE MONKEY's PAW [Se. I
+
+Mrs. WHITE. Mean to say he's beaten you at last ?
+
+HERBERT, Lor, no! Why, he's overlooked--_
+
+Mr. Wurrr (very excited). I see it ! Lemme have that back !
+
+HERBext. Not much. Rules of the game !
+
+Mr. WHITE (disgusted). I don't hold with them scientific rules. You turn what ought to be an innocent relaxation
+
+Mrs. White. Don't talk so much, Father. You put him off--
+
+HERBERT (laugiving). Not he!
+
+Mr. Wurrr (trying to distract his attention). Hark at the wind.
+
+HERBERT (dryly). Ah! I'm listening. Check.
+
+Mr. White (still trying to distract him). I should hardly think Sergeant-Major Morris'd come to. night.
+
+HERBERT. Mate, (He rises and goes up L.)
+
+Mr. WHITE (with an outbreak of disgust and sweep- ing the chessmen off the board). That's the worst of living so far out. Your friends can't come for a quiet chat, and you addle your brains over @ con- founded--
+
+HERBERT, Now, Father ! Morris'll turn up all right.
+
+as WAITE (still in a temper). Lovers' Lane, Ful- ham! Ho! Of all the beastly, slushy, out-o'-the- way places to live in-- | Pathway's a bog, and the road's a torrent,
+
+Mrs. Wurtz. Never mind, dear. Perhaps you'll win to-morrow. (She moves to the back of the table.) Mr. White. Perhaps T'll—perhaps ['}]—_ 1 What d'you mean ? (He bursts out laughing.) Thero !
+
+Sc. I] THE MONKEY'S PAW 7
+
+You always know what's going on inside 0' me, don't you, Mother ?
+
+Mrs. Wurrs. Ought to, after thirty years, John. (She goes to the dresser, and busies herself wiping tumblers on the tray there.)
+
+(He rises, goes to the fireplace and lights his pipe.)
+
+Hersert (down c.). And it's not such a bad place, Dad, after all. One of the few old-fashioned houses left near London. None o' your stucco villas. Home- like, I call it. And so do you, or you wouldn't ha' bought it. (He rolls a cigarette.) ;
+
+Mr. Wuirs (B., growling). Nice job I made o' that, too! With two hundred pounds owin' on it.
+
+HERBERT (on the back of a chair, c.). Why, I shall work that off in no time, Dad. Matter o' three years, with the rise promised me.
+
+Mr. Warrs. If you don't get married.
+
+Hersert. Not me. Not that sort.
+
+Mrs. White. I wish you would, Herbert. <A good, steady lad--
+
+(She brings the tray with a botile of whisky, glasses, & lemon, spoons, buns, and a knife to the table.)
+
+Hersert. Lots o' time, Mother. Sufficient for the day—as the sayin' goes. Just now my dynamos don't leave me any time for love-making. Jealous, they are, I tell you!
+
+Mr. Wars (chuckling). Ilay awake o' night often, and think: If Herbert took a nap, and let his what- d'you-call-ums—dynamos, run down, all Fulham would be in darkness. Lord! what a joke! (He
+
+goes B.C.) Hersert. Joke! And me with thesack! Pretty
+
+idea of a joke you've got, I don't think. (A knock is heard at the outer door.) Mrs. Waits. Hark! (The knock is repeated, louder.)
+
+8 THE MONKEY'S PAW [Se. I
+
+Mr. Wuirs (going towards the door). That's him. That's the Sergeant-Major. (He unlocks the door, back.)
+
+HERBERT (removes the chess-board). Wonder what yarn he's got for us to-night. (He places the chess. board on the piano.)
+
+Mrs. WHITE (goes up RB. and busies herself putting the other armchair nearer the fire, etc.). Don't let the door slam, John !
+
+(Mr. White opens the door a little, struggling with it. Wind. SERGEANT-Mayor MorkRIs, a veteran with a' distinct military appearance—left arm gone— dressed as a commissionaire, is seen to enter. Mr. Warts helps him Off with his coat, which he hangs up in the outer hall.)
+
+Mr. White (at the door). Slip in quick! It's as much as I can do to hold it against the wind.
+
+SercEant. Awful! Awful | (Busy taking off his cloak, etc.) And a mile up the road—by the ceme. tery—it's worse. Enough to blow the hair off your head.
+
+Mr. White. Give me your stick.
+
+SercEant. If 'twasn't I knew what a welcome I'd get--
+
+Mr. Wurtz ( preceding him into the room). Sergeant- Major Morris !
+
+Mrs. Waite. Tut! tut! So cold you must be! Come to the fire ; do'ee, now.
+
+SERGEANT. How are you, marm ? (7'o HERBERT.) How's yourself, laddie ?° Not on duty yet, eh ? Day- week, eh ?
+
+HERBERT (c.). No, sir. Night-week. But there's half an hour yet.
+
+(Mr. White mize: grog for Morris.)
+
+SERGEANT (sitting in the armchair above the fire, which Mrs. WHITE is motic ing him towards). "Thank'ee kindly, marm. That's good—hah! That's a sight better than the trenches at Chitral, That's
+
+Sc. I] THE MONKEY'S PAW 9
+
+better than settin' in puddle with the rain pourin' down in buckets, and the natives takin' pot-shots at you.
+
+Mus. Wuirz. Didn't you have no umbrellas ? (She is at the corner below the fire, and kneels before it, stirs tt, etc.)
+
+SERGEANT. Umbrell ? Ho! ho! That's good! Eh, White? That's good. Did ye hear what she said? Umbrellas!— And goloshes! and hot-water bottles!—Ho, yes! No offence, marm, but it's easy to see you was never a soldier.
+
+HERBERT (rather hurt). Mother spoke out o' kind- ness, sir.
+
+SercEant. And well I know it; and no offence intended. No, marm, 'ardship, 'ardship is the soldier's lot. Starvation, fever, and get yourself shot. That's a bit o' my own.
+
+Mrs. Wurrg. You don't look to've taken much
+
+harm (She indicates his empty sleeve. She ta the' kettle to the table, then returns to the fire.)
+
+SERGEANT (showing a medal hidden under his coat). ~And that I got this for. No,marm. Tough. Thomas Morris is tough.
+
+(Mz. Waite is holding a glass of grog wnder the SERGEANT'S nose.)
+
+And sober. What's this now ?
+
+Mr. White. Put your nose in it; you'll see.
+
+Sera@Eant. Whisky? And hot? And sugar? And a slice o' lemon? No. I said I'd never—but seein' the sort o' night. Well! (Waving the glass at them.) Here's another thousand a year!
+
+Mr. WHITE (sits R. of the table, also with a glass). Same to you, and many of 'em.
+
+SERGEANT (to HERBERT, who has no glass). What ? Not you ? :
+
+HERBERT (laughing and sitting across his chair, ©.). Oh ! 'tisn't for want of being sociable. But my work don't go with it. Not if 'twas ever so little. I've
+
+10 THE MONKEY''s PAW * [So.1 got to keep a cool head, a steady eye, and a still hand. The fly-wheel might gobble me up.
+
+Mrs. Wuirz. Don't, Herbert. (She sits in the armchair below the fire.)
+
+HERBERT (laughing). No fear, Mother.
+
+Sergeant. Ah! you electricians !—Sort o' magi- cians, you are. Light! says you—and light it is. And, power! says you—and the trams go whizzin'. And, knowledge! says you—and words go 'ummin' to the ends o' the world. It fair beats me—and I've seen a bit in my time, too.
+
+HERBERT (nudges his father). Your Indian magic ? All a fake, governor. The fakir's fake.
+
+Smrceant. Fake, you call it? I tell you, I've seen it.
+
+HERBERT (nudging his father with his foot). Oh, come, now! such as what? Come, now!
+
+SERGEANT. I've seen a cove with no more clothes on than a babby, (to Mrs. Warr) if you know what I mean—take an empty basket--empty, mind !—as empty as—as this here glass--
+
+Mr. Wuirg. Hand it over, Morris. (He hands it to HERBERT, who goes quickly behind the table and fills it.)
+
+SeRcEant. Which was not my intentions, but used for illustration.
+
+HERBERT (while mixing). Oh, I've seen the basket trick; and I've read how it was done. Why, I could do it myself, with a bit o' practice. Ladle out something stronger.
+
+(HERBERT brings him the glass.)
+
+SERGEANT. Stronger ?—what do you say to an old fakir chuckin' a rope up in the air—in the atr, mind you !—and swarming up it, same as if it was *ooked on—and vanishing clean out o' sight ?—I've seen that. : :
+
+(HERBERT goes to the table, plunges a knife into a bun and offers it to the SERGEANT with exaggerated politeness.)
+
+ny sian }
+
+Spinees seta det | rt tae
+
+Sco. I)
+
+(Eyeing it with disgust.) Bun—? What for ? HERBERT. That yarn takes it.
+
+(Mr. and Mrs. White are delighted.)
+
+SERGEANT. Mean to say you doubt my word ?
+
+Mrs. Wuitr. No, no! He's only taking you off.—You shouldn't, Herbert.
+
+Mr. Wuirr. Herbert always was one for a bit 0' fun !
+
+(HERBERT puts the bun back on the table, comes round in front and, moving the chair out of the way sits cross-legged on the floor at his father's side.)
+
+SERGEANT. i it it's true. Why, if I chose, I could tell you things--_ But there! wou don't get no more yarns out o' me.
+
+Mr. Wurtz. Nonsense, old friend. 'He puts down his glass.) You're not going to get shirty about a bit o' fun. (He moves his chair nearer Morpis's.) What was that you started telling me the other day about a monkey's paw, or something ? (He nudges HERBERT, and winks at Mrs. WHITE.)
+
+SERGEANT (gravely). Nothing. Leastways, nothing worth hearing.
+
+Mrs. WHITE (with astonished curiosity). Monkey s paw— ?
+
+Mr. Waits. Ah—you ~ae tellin'? me--
+
+Sercreant. Nothing. Don't go cu about it. (He puts his empty glass to his lips—then stares at it.) What? Empty again? There! When I begin thinkin' o' the paw, it makes mc that absent- minded--
+
+M:. WHITE (rises and fills the glass. Y aid you alweys ca:Tied it on you.
+
+Serakeant. Sol do, for fear o' what might happen. (Sunk in thought.) Ay !—ay!
+
+Mr. Warts (handing him his glass refilled), 'There. (He sits again in the same chair.)
+
+Mrs. Wurtz. What's it for ?
+
+THE WONKEY'S PAW (Se. I Serxezant. You wouldn't believe me, if i was to
+
+Herpert, I will, every word.
+
+SERGEANT. Magic, then !--Don't you laugh | HERBERT. I'm not. Got it on you now ? SERGEANT. Of course.
+
+HeErpert. Let's see it.
+
+(Seeing the SeRGEant embarrassed with his glass, Mrs. Wurrr rises, takes it from him, places it on the mantelpirce and remains stand; g.)
+
+SERGEANT. Oh, it's nothing to look at. (Hunting in his pocket.) Just an ordinary—little paw—dried to & mummy. (Produces it and holds it towards Mrs. Wart.) Here.
+
+Mrs. Wma (who has leant forward eagerly to see é:, siarts back with a little cry of disgust). Oh!
+
+HERBERT. Give us a lock.
+
+(Morris passes the paw to Mr. White, from whom HERBERT takes it.) Why, it's all dried up! SErceant. I said so.
+
+Mrs. Wr:TE (with a slight shudder). Hark at the wind! (She sits again in her old place.)
+
+Mr. Wuirer (taking the paw from HERBERT.) And what might there be special about .1 ?
+
+SERGEANT (impressively). That there paw has had & spell put upon it!
+
+Mr. White. No? (In great alarm he thrusts the paw back into Morris's hand.)
+
+SERGEANT (pensively, holding the paw in the palm . of hishand). Ah! By anold fakir. He was & very holy man. He'd sat all doubled up in one gpot, goin' on for fifteen year; thinkin' 0' things. And he wanted to show that fate ruled people. That every- thing was cut and dried from the beginning, as you might say. That there warn't no gettin' away from
+
+Se. I] THE MONKEY'S PAW 13
+
+it. And that, if you tried to, you caught it hot. (He pauses solemnly.) So he put a spell on this bit of a paw. It might ha' been anything else, but he took the first thing that came handy. Ah! He put a spell on it, and made it so that three people (looking ut them and with deep meaning) could each have three wishes.
+
+(All but Mrs. WurTE laugh rather nervously.)
+
+Mrs. Wurtz. Ssa! Don't!
+
+SERGEANT (more gravely) But--! But, mark you, though the wishes was granted, those three people would have cause to wish they hadn't been.
+
+Mr. White. But how could the wishes be granted ?
+
+Serceant. He didn't say. It would all happen so natural, you might think it a coincidence if so disposed.
+
+Hersert. Why haven't you tried it, sir?
+
+SERGEANT (gravely, after a pause). I have.
+
+H-:RBert (eagerly). You've had your three wishes ?
+
+SERGEANT (gravely). Yes.
+
+Mrs. Warr. Were they granted ?
+
+SuRGEAnt (staring at the fire). They were.
+
+(A pause.) Mr. Wurrs. Has anybody else wished ? Serceant. Yes. The first owner had his three wish (Lost in recollection.) Yes, ob ves, he had his three wishes all right. I don't know what his first two were, (very impressively) but the third was for death. (AU shudder.) That's how I got the paw.
+
+(A pause.) Hersert (cheerfully). Well! Seems to me you've only got to wish for things that can't have any bad luck about '°em-- (He rises.)
+
+SercRant (shaking his head). Ah! Mr. White (tentatively). Morris—if you've had
+
+14 THE MONKEY'S PAW {Se.I
+
+your three wishes—it's no good to you, now—what do you keep it for ?
+
+SERGEANT (still holaing the paw ; looking at it). Fancy, I s'pose. I did have some idea of selling it but I don't think I will. It's done mischief enough already. Besides, people won't buy. Some of 'em think it's a fairy tale. And some want to try it first, and pay after.
+
+(There is a nervous laugh from the others.)
+
+Mrs. Wurtz. If you could have another three wishes, would you?
+
+SERGEANT (slowly—weighing the paw in his hand, and looking at it). I don't know—I don't know-- (Suddenly, with violence, flinging it in the fire.) No! I'm damned if I would !
+
+(There is @ movement from all.)
+
+Mr. WuirE (rises and quickly snatches it out of the fire). What are you doing? (He goes R.C.)
+
+SERGEANT (rising and following him and trying to prevent him). Let it burn! Let the infernal thing burn !
+
+Mrs. WuiTE (rises). Let it burn, Father !
+
+Mr. WHITE (wiping it on his coat-sleeve). No. If you don't want it, give it to me.
+
+SERGEANT (violently) I won't! I won't! My hands are clear of it. I threw it on the fire. If you keep it, don't blame me, whatever happens. Here! Pitch it back again.
+
+Mr. White (stubbornly). I'm going to keep it. What do you say, Herbert ?
+
+HERBERT (L.c., laughing). I say, keep it if you want to. Stuff and nonsense, anyhow.
+
+Mr. White (looking at the paw thoughtfully). Stuff and nonsense. Yes. I wonder—(casually) I wish-- (He was going to say some ordinary thing, like "I wish I were certain.'')
+
+SERGEANT (misunderstanding him ; violently). Stop | Mind what you're doing. That's not the way.
+
+ited wnsaibe tanec senctperaivinincs avon
+
+8c. I) THE MONKEY'S PAW 15
+
+Mr. Warts. What is the way ?
+
+Mrs. WHITE (moving away, up B.0. to the back of the table, and beginning to put the tumblers straight, and the chairs in their places). Oh, don't have any- thing to do with it, John.
+
+(She takes the glasses on a tray to the dresser, L., and busies herself there, rinsing them in a bowl of water on the dresser and wiping them with a cloth.)
+
+_Serczant. That's what I say, marm. But if I warn't to tell him, he might go wishing something he didn't mean to. You hold it in your right hand, and wish aloud. But I warn you! I warn you!
+
+Mrs. Waite. Sounds like the Arabian Nights. Don't you think you might wish me four pair o" hands ?
+
+Mr. Warts (laughing). Right you are, Mother !— I wish--
+
+SERGEANT (pulling his arm down). Stop it! If you must wish, wish for something sensible. Look here! I can't stand this. Gets on my nerves. Where's my coat ? (He goe* into the alcove.)
+
+(Mr. White crosses to the fireplace and carefully puts the paw on the mantelpiece. He is absorbed in it to the end of the tableau.)
+
+Hersert. I'm coming your way, to the works, in a minute. Won't you wait? (He goes up o. and helps Morris with his coat.)
+
+SERGEANT (putting on his coat.) No. I'mallshook up. I want fresh air. I don't want to be here when you wish. And wish you will as soon's my back's turned. I know. I know. But I've warned you, mind.
+
+Mr. White (helping him into his coat). All right, Morris. Don't you fret about us. (He gives him money.) Here.
+
+SERGEANT (refusing it). No, I won't--
+
+Mr. White (forcing it into his hand). Yes, you will. (He opens the door.)
+
+16 THE MONKEY'S PAW [Sc. I
+
+SERGEANT (turning to the room). Well, good night, all. (To Wuirs.) Put it in the fire. ALL night.
+
+(Exit Szerceant. Mr. White closes the door, comes towards the fireplace, absorbed in the paw.)
+
+HERBERT (down 1.). If there's no mote in this than there is in his other stories, we shan't make much out of it.
+
+Mrs. WurrE (comes down R.0. to Wurtz). Did you give him anything for it, Father ?
+
+Mr. White. A trifle. He didn't want it, but I made him take it.
+
+Mrs. Wuirz. There, now! You shouldn't. Throwing your money about.
+
+Mr. Wuits (looking at the paw which he has picked up again). I wonder—~— ?
+
+HERBERT. What ?
+
+Mr. White. I wonder whether we hadn't better chuck it on the fire ?
+
+Hersert (laughing), Likely! Why, we're all going to be rich and famous, and happy.
+
+Mrs. Wurte. Throw it on the fire, indeed, when you've given money for it! So like you, Father.
+
+HERBERT. Wish to be an Emperor, Father, to begin with. Then you can't be henpecked !
+
+Mrs. Wuitr (going for him in front of the table with a duster). You young--! (She follows him to the back: of the table.)
+
+HERBERT (running away from her round behind the table). Steady with that duster, Mother |
+
+Mr. WuitEe. Be quiet there !
+
+(HERBERT catches Mrs. Warts in his arms and kisses her.)
+
+I wonder. ? (He has the paw in his hand.) Idon't know what to wish for, and that's a fact. (Hc looks about him with a happy smile.) I seem to've got all I want.
+
+HERBERT (with his hands on the old man's shoulders),
+
+All,dad? If you'd only cleared the debt on the house, ou'd be quite happy, wouldn't you? (Laughing.' ell—go ahead !—wish for the two hundred pounds; that'll just do it. Mr. Wuits (half laughing). Shall 1?
+
+(He crosses to B.C.) HERBERT. Go un! Heset—I'll play. slow music. (He crosses to the piano.) Mrs. WuiTE. Don't'ee, John. Don't have nothing to do with it! HERBERT. Now, Dad! (He plays.)
+
+Mr. Wuirse. I will! (He holds up the paw, as if half ashamed.) I wish for two hundred pounds.
+
+(Crash on the piano. At the same instant Mr. WHITE utters a cry and lets the paw drop.)
+
+cath a (together). What's the matter ?
+
+Mr. WHITE (gazing wuh horror at the paw). It moved! As I wished, it twisted in my hand like a snake.
+
+HERBERT (goes down R., and picks the paw up). Nonsense, Dad. Why, it's as stiff as a bone. (He lays it on the mantelpiece.)
+
+Mrs. White. Must have been your fancy, Father.
+
+HERBERT (laughing). Well-- ? (Looking round the room.) I don't see the money ; and I bet I never shall.
+
+Mr. White (relieved). Thenk God, there's no harm done! But it gave me a shock.
+
+HERBERT. Half-past eleven. I must get along. I'm on at midnight. (He goes up c., fetches his coat, etc.) We've had quite a merry evening.
+
+Mrs. White. I'm off to bed. Don't be late for breakfast, Herbert.
+
+HERBERT. I shall walk home as usual. Does me good. I shall be with you about nine. Don't wait, though.
+
+Mrs. Wurrs. You know your father never waits.
+
+18 THE MONKEY'S PAW [Sc. I
+
+Herpert. Good night, Mother.
+
+(He kisses her She lights the candle on the dresser, L., oes up the stairs and exits.)
+
+(Com:ng to his father, R., who is sunk in thought.)
+
+Good night, Dad. You'll find the cash tied up in
+
+the middle of the bed.
+
+Mr. Wurrs (staring, seizes Hursert's hand). It moved, Herbert.
+
+Herpert. Ah! And a monkey hanging by his tail from the bed-post, watching you count the golden sovereigns.
+
+: Mr. WHITE (accompanying him to the door). I wish you wouldn't joke, my boy.
+
+Hersert. All right, Dad. (He opens the door.) Lord! What weather! Good night. (He ezits.)
+
+(The old man shakes his head, closes the door, locks it, puts the chain up and slipe the lower bolt, but has some difficulty with the upper bol?.\
+
+Mr. Wuirs. This bolt's stiff again! I must get Herbert to look to it in the morning.
+
+(He comes into the room, puts out the lamp and crosses towards the steps; but is irresistibly attracted to- wards the fireplace. He sits down and stares into the fire. His expression changes: he sees something horrible.)
+
+(With an involuntary cry.) Mother! Mother!
+
+Mrs. WHITE (appearing at the door at the top of the steps with a candle). What's the matter? (She comes down B.C.)
+
+Mr. WHITE (mastering himself. He rises). Nothing —I—haha !—I saw faces in tho fire. és
+
+Mrs. WurrE. Come along.
+
+(She takes his arm and draws him towards the steps. He looks back frightened towards the fireplace as they reach the first step.)
+
+TaBLEAU CURTAIN. R '
+
+SCENE II
+
+Scunz.—Bright sunshine. The table, which has been
+
+nearer the window, is laid "or breakfast.
+
+Mrs. Waite is busy about the table. Mr. White
+
+is standing in the window looking off x. The inner door is open, showing the outer door.
+
+Mr. Warze. What » morning Herbert's got for walking home !
+
+Mrs. WHITE (L.C.). What's o'clock ? (She looks at the clock on the mantelpiece.) Quarter to nine, I declare. He's off at eight. (She crosses to the fire.)
+
+Mr. White. Takes him half an hour to cha: and wash. Ho's just by the cemetery now.
+
+Mrs. WuitE. He'll be here in ten minutes,
+
+_ Mr. WuHitE (coming to the table). What's for breakfast ?
+
+Mrs. Warr. Sausages. (At the mantelpiece.) Why, i* here isn't that dirty monkey's paw! (She picks it up, looks at it with disgust, and puts it back. She takes some sausages in a dish from before the fire and places tiem on the table.) Silly thing! The idea of us listening to such nonsense !
+
+Mr. WHITE (go up to the window again). Ay— the Sergeant Major and his yarns! I suppose all old soldiers are alike--
+
+Mrs. Wuitz. Come on, Father. Herbert hates us to wait.
+
+(They both sit and begin breakfast.)
+
+How could wishes be granted, nowadays ? Mr. White. Ah! Been thinking about it all night, have you ? Mrs. Wuite. You kept me awake, with your tossing and tumbling-- Mr. Wurtz. Ay, I had a bad night.
+
+20 THE MONKEY'S PAW [Se. II
+
+Mrs. White. It was the storm, I expect. How it blew !
+
+Mr. White. I didn't hear it. I was asleep and not asleep, if you know what I mean.
+
+Mrs. Waite. And all that rubbish about its making you unhappy if your wish was granted ! How could two hundred pounds hurt you, eh, Father ?
+
+Mr. WHITE. Might drop on my head in a lump. Don't see any other way. And I'd try to bear that. Though, mind you, Morris said it would all happen so naturally that you might take it for a coincidence, if so disposed.
+
+Mrs. WHITE. Well—it hasn't happened. That's all I know. And it isn't going to. (A letter is seen
+
+to drop in the letter-box.) And how you can sit there and talk about it
+
+(There is @ sharp postman's knock ; she jumps to her feet.)
+
+What's that ?
+
+Mr. White. Postman, o' course.
+
+Mrs. WuITE (seeing the letter from distance ; in an awed whisper). He's brought a letter, John!
+
+Mr. WuirE (laughing). What did you think he'd bring? Ton o' coals ?
+
+Mrs. White. John—! John—! Suppose-- ?
+
+Mr. Wuirr. Suppose what ?
+
+Mrs. Wurrg. Suppose it was two hundred pounds !
+
+Mr. Wuirr (suppressing his excitement). Eh !— Here! Don't talk nonsense. Why don't you fetch it ?
+
+Mrs. White (crosses and takes the letter out of the bor). It's thick, John—(she feels it)—and—and it's got something crisp inside it.
+
+(She takes the letter to WHITE, R.c.) .
+
+Mr. White. Who—who's it for ? Mrs. Wurtz. You.
+
+Mr. Wurtz. Hand it over, then. (Feeling and
+
+Sco. IT} THE MONKEY'S PAW 21
+
+examining it with ill-concealed excitement.) The idea !
+
+<What a superstitious old woman you are! Where
+
+are my specs ?
+
+Mrs. Wurtz. Let me open it.
+
+Mr. Wurtz. Don't you touch it. Where are my specs. (He goes to R.)
+
+Mrs. Wurtz. Don't let sudden wealth sour your temper, John.
+
+Mr. Wurtz. Will you find my specs ?
+
+Mrs. WuirE (taking them off the mantelpiece). Here, John, here. (As he opens the letter.) Take care! Don't tear it!
+
+Mr. Wurtz. Tear what ?
+
+Mrs. White. If it was banknotes, John !
+
+Mr. Wurrs (taking a thick, formal document out of the envelope and a crisp-looking slip). You've gone dotty.—You've made me _ nervous. (He reads.) " Sir,—Enclosed please find receipt for interest on the mortgage of £200 on your house, duly received."
+
+(They look at each other. Mr. White sils down to finish his breakfast silently. Mrs. White goes to the window.)
+
+Mrs. Wurtz. That comes of listening to tipsy old soldiers.
+
+Mr. WHITE (pettish). What does ?
+
+Mrs, Wurtz. You thought there was banknotes in it.
+
+Mr. WHITE (injured). I didn't! I said all along
+
+Mrs. WuiTe. How Herbert will laugh, when I tell him!
+
+Mr. WHITE (with gruff good-humour). You're not going to tellhim. You're going to keep your mouth shut. That's what you're going to do. Why, I should never hear the last of it.
+
+Mrs. Wuite. Serve you right. I shall tell him. You know you like his fun. See how he joked you last night when you said the paw moved.
+
+(She is looking through the window towards R.)
+
+THE MONKEY'S Paw: [Sc. II
+
+Mr. Wars. So it did. It did move. That I'll swear to j : Mrs. Wuarrr (absiractedly : she ig watching some-
+
+thing outside). You thought it did. _ Mr. Wars. I say it did. There was no thinking about it. You saw how it upset me, didn't you ?
+
+(She doesn't answer.) Didn't you ?—Why don't you listen ?
+
+(She turns round.)
+
+What is it ? Mrs. Wurtz. Nothing. Mr. Warts (turns back to his breakfast). Do you see Herbert coming ? Mrs. Wurtz. No. Mr. Wuirz. He'
+
+@ gentleman. Leastways, he's in black. - Wurrz. What about -him ? (He is not interested, and goes on eating.) - Ware. He stood at the garden-gate as if he wanted tocomein. But he couldn't seem to make
+
+up his mind. Mr. Wurrs. Oh, go on! You're full 0' fancies. . Warr. He's going—no ; he's coming back.
+
+Mr. Wuirr. Don't let him seo you peeping.
+
+Mrs. Wuirz (with increasing excitement). He's looking at the house. He's got his hand on the latch. No. He turns away again. (Hagerly.) John! He looks like a sort of a lawyer. .
+
+Mr. Wuirr. What of it ?
+
+Mrs. Wurrz. Oh, you'll only laugh again. But Suppose—suppose he's coming about the two hun- dred-- :
+
+Mr. Wurtz. You're not to mention it again !|— You're a foolish old woman.—Come and eat your breakfast, (Hagerly.) Where is he now ?
+
+So. 11} THE MONKEY'S PAW 23
+
+Mrs. Wurtz. Gone down the road. He has turned back. He seems to've made up his mind. Here he comes !—Oh, John, and me all untidy! (She crosses to the fire BR.)
+
+(A knock is heard.)
+
+Mr. Wuirs (to Mrs. WurtE, who is hastily smoothing her hair, etc.). What's it matter? He's made a mistake. Come to the wrong house. (He crosses to the fireplace.)
+
+(Mrs. WurrE opens the door. Mr. Sampson, dressed from head to foot in solemn black, stands in the doorway.)
+
+Sampson (outside). Is this Mr. White's ? Mrs, WuirTr. Come in, sir. Please step in.
+
+(She shows him into the room and goes. He is awkward and nervous.)
+
+You must overlook our being so untidy; and the room all anyhow ; and John in his garden-coat. (Z'o Mr. WHiIrTE, reproachfully). Oh, John.
+
+Sampson (fo Mz. Wuirr). "Morning. My name is Sampson.
+
+Mrs. Wuirs (offering a chair). Won't you please be seated ?
+
+(SAMPSON stands quite still up o.)
+
+Sampson. Ah—thank you—no, I think not—I think not.
+
+(A pause.)
+
+Mr. WHITE (awkwardly, tryin7 to help him). Fine weather for the time o' year.
+
+Sampson. Ah—yes—yes-- (A pause; he makes a renewed effort.) My name is Sampson—I've come--
+
+Mrs. Wuitr. Perhaps you was wishful to see Herbert ; he'll be home in a minute. (Pointing). Here's his breakfast waiting--
+
+24 THE MONKEY'S PAW (Sc. IT
+
+Sampson (interrupting her hastily) No, no! (A pause.) I've come from the electrical works--
+
+Mrs. Wirz. Why, you might have come with him. :
+
+(Mz. WurrE sees something is wrong and tenderly puts his hand on her arm.)
+
+Sampson. No—no—I've come—alone.
+
+Mrs. WHITE (with a little an. ety). Is anything the matter ?
+
+Sampson. I was asked to call--
+
+Mrs. White (abruptly). Herbert! Has anything happened? Is he hurt? Is he hurt ?
+
+Mr. WHITE (soothing her). There, there, Mother. Don't you jump to conclusions. Let the gentleman speak. You've not brought bad news, I'm sure, sir.
+
+Sampson. I'm—sorry--
+
+Mrs, Wuirr. Is he hurt ?
+
+(Sampson bows.)
+
+Badly ? °
+
+Sampson. Very Ladly. (He turns away.)
+
+Mrs. WuITE (with a cry). John—! (She in- stinctively moves towards WHITE.)
+
+Mr. Wuirs. Is he in pain ?
+
+Sampson. He is not in pain.
+
+Mrs. Wurtz. Oh, thank God! Thank God for that! Thank-- (She looks in a startled fashion at Mr. WuitEe—realizes what SAMPSON means, catches his arm and tries to turn him towards her). Do you mean-- ?
+
+(Sampson avoids her look ; she gropes for her husband : he takes her two hands in his, and gently lets her sink into the armchair above the jireplace, then he stands on her right, between her and SaMPson.)
+
+Mr. Wuirr (hoarsely). Go on, sir. Sampson. He was telling his mates a story. Something that had happened here last night. He
+
+eee
+
+Sc. IT} THE MONKEY'S PAW 25
+
+was laughing, and wasn't noticing and—and—(hushed) the machinery caught him--
+
+(A little cry from Mrs. White, her foce shows her . horror and agony.)
+
+Mr. Warts (vaguel:), holding Mrs. Wurtn's hand). The machinery caught him—yes—and him the only child—it's hard, sir—very hard--
+
+SAMPSON (subdued). The Company wished me to convey their sincere sympathy with you in your great loss--
+
+Mr. WHITE (staring blankly). Our—great— loss-- !
+
+Sampson. I was to say further—(as if apologizing) Tam only their servant—I am only obeying orders
+
+Mr. White. Our—great—loss--
+
+Sampson (laying an envelope on the table and edging towards the door). I was to say, the Company dis- claim all responsibility, but, in considerc+ion of your son's services, they wish to present you with a certain sum as compensation. (Gets to dcor.
+
+Mr. White. Our— great—loss-- (Suddenly, with horror.) How—how much ?
+
+Sampson (in the doorway). Two hundred pounds
+
+(He exits.)
+
+(Mrs. White gives cry. The old man takes no heed
+
+of her, smiles faintly, puts out his hands like a sight-
+
+man, 'nd drops, a senseless heap 'o the jloor.
+
+Mrs. V : stares at him blankly ana her hands go out help. _y towards him.)
+
+TABLEAU CURTAIN.</script>
+
+<script>
+let paras = [], records = [], selIdx = -1, currentName = "";
+let charFilter = new Set(), pinned = null;
+
+function sig(r){ return [r.kind, r.speaker||"", (r.props_mentioned||[]).join(","),
+  (r.difficulty||[]).join(","), (r.homophones_in_line||[]).join(","), r.hesitations||0].join("|"); }
+
+function pinSnapshot(){ pinned = records.map(sig);
+  document.getElementById('diffinfo').textContent = "Snapshot pinned ("+pinned.length+" rows). Change one knob.";
+  render(); }
+function clearSnapshot(){ pinned = null; document.getElementById('diffinfo').textContent = ""; render(); }
+
+function rowMatchesFilter(r){
+  const v = document.getElementById('viewFilter').value;
+  if(v==="unsure" && r.kind!=="unsure") return false;
+  if(v==="direction" && r.kind!=="direction") return false;
+  if(v==="props" && !(r.kind==="line" && r.props_mentioned)) return false;
+  if(v==="mono" && !(r.kind==="line" && r.difficulty)) return false;
+  if(v==="homo" && !(r.kind==="line" && r.homophones_in_line)) return false;
+  if(charFilter.size && r.kind==="line" && !charFilter.has(r.speaker)) return false;
+  if(charFilter.size && r.kind!=="line" && v==="all") return false;
+  return true;
+}
+
+function renderFilters(){
+  const bar = document.getElementById('filterbar');
+  bar.style.display = records.length ? "flex" : "none";
+  const chars = [...new Set(records.filter(r=>r.kind==="line").map(r=>r.speaker))];
+  charFilter = new Set([...charFilter].filter(c=>chars.includes(c)));
+  document.getElementById('charChips').innerHTML = chars.map(c =>
+    '<span class="chip'+(charFilter.has(c)?' on':'')+'" onclick="toggleChar(\''+c.replace(/'/g,"\\'")+'\')">'+escapeHtml(c)+'</span>').join(" ");
+}
+function toggleChar(c){ charFilter.has(c) ? charFilter.delete(c) : charFilter.add(c); renderFilters(); render(); }
+function applyFilters(){ render(); }
+
+function togglePaste(){ const p=document.getElementById('pastebox'); p.style.display = p.style.display==='block'?'none':'block'; }
+function loadSample(){ start(document.getElementById('sampleText').textContent, "Trifles (built-in sample)"); }
+function loadSample2(){ start(document.getElementById('sampleText2').textContent, "The Monkey's Paw (dirty OCR scan)"); }
+function loadPaste(){ start(document.getElementById('pastetext').value, "pasted text"); togglePaste(); }
+function loadFile(inp){ const f=inp.files[0]; if(!f) return;
+  f.text().then(t => start(t, f.name)); }
+
+function start(text, name){
+  currentName = name;
+  document.getElementById('loadedName').textContent = "Loaded: " + name;
+  paras = text.split(/\r?\n\s*\r?\n/).map(p => p.replace(/\s+/g," ").trim()).filter(Boolean);
+  reparse();
+  document.getElementById('practiceBtn').style.display = "inline-block";
+  if(document.getElementById('practicePane').style.display==="block") buildPractice();
+}
+
+const CAPS_RE  = /^([A-Z][A-Z .']{1,28}?):\s*(.*)$/s;
+const MIXED_RE = /^((?:Mr\.|Mrs\.|Miss |Dr\.)?\s?[A-Z][A-Za-z']+(?: [A-Z][A-Za-z']+)?)\s*(\([^)]*\))?\s*[.:]\s+(.+)$/s;
+const HOMOPHONES = { knot:"not", not:"knot", hear:"here", here:"hear", no:"know", know:"no", two:"to" };
+
+function detectConvention(){
+  let caps=0, mixed=0;
+  for(const p of paras){ if(CAPS_RE.test(p)) caps++; else if(MIXED_RE.test(p)) mixed++; }
+  return caps >= mixed ? "caps" : "mixed";
+}
+
+function reparse(){
+  if(!paras.length) return;
+  document.getElementById('monoV').textContent = document.getElementById('mono').value;
+  const monoCut = +document.getElementById('mono').value;
+  const dash = document.getElementById('dash').value || "--";
+  const propList = document.getElementById('props').value.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean);
+  let conv = document.getElementById('convention').value;
+  if(conv==="auto") conv = detectConvention();
+
+  records = []; let prev=null, lineNo=0, cumWords=0;
+  for(const p of paras){
+    if(/^(SCENE [IVX0-9]|ACT [IVX0-9]|\(?CURTAIN\)?$|TABLEAU)/i.test(p)){
+      records.push({kind:"heading", text:p}); continue;
+    }
+    let m = conv==="caps" ? p.match(CAPS_RE) : p.match(MIXED_RE);
+    let speaker=null, inlineDir=[], spoken=null, unsure=false;
+    if(m && conv==="caps"){ speaker=m[1]; spoken=m[2]; }
+    else if(m){ speaker=m[1].trim(); if(m[2]) inlineDir.push(m[2].replace(/[()]/g,"").trim()); spoken=m[3]; }
+
+    if(speaker && speaker.split(" ").length > 3) { speaker=null; }   // probably a sentence, not a name
+    if(speaker && /^(SCENE|ACT|SETTING|TIME|PLACE)$/i.test(speaker.trim())) { speaker=null; }
+
+    if(!speaker){
+      const isDir = /^[\(\[]/.test(p) || /^(SCENE\.|Scene\.)/.test(p) || p.replace(/_/g,"").startsWith("SCENE:");
+      records.push({kind: isDir ? "direction" : "unsure", text:p.replace(/_/g,"")});
+      continue;
+    }
+    lineNo++;
+    // pull remaining inline (directions) out of spoken text
+    spoken = spoken.replace(/\((_?)([^)]*?)(_?)\)/g, (a,b,d)=>{ inlineDir.push(d.trim()); return " "; })
+                   .replace(/_/g,"").replace(/\s+/g," ").trim();
+    const words = spoken.match(/[A-Za-z']+/g) || [];
+    cumWords += words.length;
+    const lower = " "+spoken.toLowerCase()+" ";
+    const props = propList.filter(w => lower.includes(" "+w) || inlineDir.join(" ").toLowerCase().includes(w));
+    const homos = [...new Set(words.map(w=>w.toLowerCase()).filter(w=>HOMOPHONES[w]))];
+    const rec = {
+      kind:"line", line_no:lineNo, speaker:speaker.toUpperCase(), text:spoken,
+      inline_directions: inlineDir.length?inlineDir:null,
+      cue_speaker: prev?prev.speaker:null,
+      cue_line: prev?prev.text:null,
+      word_count: words.length,
+      hesitations: spoken.split(dash).length-1,
+      interrupted: spoken.endsWith(dash),
+      approx_time_min: Math.round(cumWords/150*10)/10,
+      cue_word: words.length?words[words.length-1].toLowerCase():null,
+      homophones_in_line: homos.length?homos:null,
+      props_mentioned: props.length?props:null,
+      difficulty: words.length>monoCut ? ["long_monologue"] : null,
+      to_who: {value: prev?prev.speaker:null, confidence:"guess:reply-to-cue"},
+      for_why:null, tone_delivery:null, famous_line_match:null
+    };
+    records.push(rec); prev=rec;
+  }
+  renderFilters(); render(); renderStats(); renderScore();
+}
+
+function render(){
+  const el = document.getElementById('script'); el.innerHTML="";
+  const hide = document.getElementById('hideOthers').checked;
+  let changed = 0;
+  records.forEach((r,i)=>{
+    const match = rowMatchesFilter(r);
+    if(!match && hide) return;
+    const d=document.createElement("div");
+    d.className="row "+(r.kind==="line"?"":r.kind)+(i===selIdx?" sel":"")+(match?"":" dim");
+    if(pinned && pinned[i]!==undefined && pinned[i]!==sig(r)){ d.className+=" changed"; changed++; }
+    if(r.kind==="line"){
+      let text = escapeHtml(r.text);
+      (r.props_mentioned||[]).forEach(p=>{
+        text = text.replace(new RegExp("\\b("+p.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")\\b","i"), '<span class="prop">$1</span>');
+      });
+      d.innerHTML = '<span class="who">'+escapeHtml(r.speaker)+':</span>'
+        + (r.inline_directions? ' <span class="dir">('+escapeHtml(r.inline_directions.join("; "))+')</span> ' : ' ')
+        + text
+        + (r.difficulty? ' <span class="badge mono">monologue</span>':'')
+        + (r.homophones_in_line? ' <span class="badge homo">homophone: '+r.homophones_in_line.join(", ")+'</span>':'');
+    } else {
+      d.textContent = r.text;
+    }
+    d.onclick = ()=>{ selIdx=i; render();
+      document.getElementById('detailJson').textContent = JSON.stringify(r,null,2); };
+    el.appendChild(d);
+  });
+  if(pinned){
+    const n = pinned.length===records.length ? changed+" line(s) changed since the pinned snapshot."
+      : "Row count changed ("+pinned.length+" pinned vs "+records.length+" now) — orange marks may be shifted.";
+    document.getElementById('diffinfo').textContent = n;
+  }
+}
+
+function renderStats(){
+  const lines = records.filter(r=>r.kind==="line");
+  const unsure = records.filter(r=>r.kind==="unsure").length;
+  const byChar = {};
+  lines.forEach(r=>byChar[r.speaker]=(byChar[r.speaker]||0)+1);
+  const total = lines.reduce((s,r)=>s+r.word_count,0);
+  let html = '<table class="stats">';
+  html += '<tr><td><b>'+lines.length+'</b> dialogue lines</td><td>~'+Math.round(total/150)+' min</td></tr>';
+  Object.entries(byChar).sort((a,b)=>b[1]-a[1]).forEach(([c,n])=>{
+    html += '<tr><td>'+escapeHtml(c)+'</td><td>'+n+' lines</td></tr>';
+  });
+  html += '</table>';
+  if(unsure) html += '<p class="hint" style="color:var(--warn)">'+unsure+' paragraphs the parser could not classify (yellow). Fewer is better.</p>';
+  document.getElementById('stats').innerHTML = html;
+}
+
+function textKey(){ let h=0; const s=paras.join("|");
+  for(let i=0;i<s.length;i++){ h=(h*31 + s.charCodeAt(i))>>>0; } return "dexgold_"+h; }
+
+function loadGoldStore(){
+  const raw = localStorage.getItem(textKey());
+  if(!raw) return null;
+  const data = JSON.parse(raw);
+  if(Array.isArray(data)) return {v:2, current:{saved:"(older save)", lines:data}, history:[]};
+  return data;
+}
+
+function saveGolden(){
+  const lines = records.filter(r=>r.kind==="line").map(r=>({line_no:r.line_no, speaker:r.speaker}));
+  let store = loadGoldStore();
+  if(store){
+    if(!confirm("An answer key already exists for this play. Overwrite it?\n\n(The old key is kept — you can bring it back with 'Restore previous answer key'.)")) return;
+    store.history.unshift(store.current);
+    store.history = store.history.slice(0,2);
+    store.current = {saved:new Date().toLocaleString(), lines};
+  } else {
+    store = {v:2, current:{saved:new Date().toLocaleString(), lines}, history:[]};
+  }
+  localStorage.setItem(textKey(), JSON.stringify(store));
+  renderScore();
+  alert("Answer key saved ("+lines.length+" lines). The score now compares every future parse against it.");
+}
+
+function restoreGolden(){
+  const store = loadGoldStore();
+  if(!store || !store.history.length) return;
+  const prev = store.history.shift();
+  store.history.unshift(store.current);   // swap, so nothing is ever lost
+  store.history = store.history.slice(0,2);
+  store.current = prev;
+  localStorage.setItem(textKey(), JSON.stringify(store));
+  renderScore();
+}
+
+function renderScore(){
+  const store = loadGoldStore();
+  const box = document.getElementById('score');
+  const restoreBtn = document.getElementById('restoreGold');
+  const info = document.getElementById('goldInfo');
+  if(!store){ box.innerHTML = '-<small>No answer key saved for this play yet. When the parse looks right, save one.</small>';
+    restoreBtn.style.display="none"; info.textContent=""; return; }
+  const gold = store.current.lines;
+  const lines = records.filter(r=>r.kind==="line");
+  let match=0;
+  gold.forEach(gl=>{ const r=lines.find(l=>l.line_no===gl.line_no);
+    if(r && r.speaker===gl.speaker) match++; });
+  const pct = gold.length? Math.round(1000*match/gold.length)/10 : 0;
+  const col = pct>=98?"var(--ok)":pct>=90?"var(--warn)":"var(--bad)";
+  box.innerHTML = '<span style="color:'+col+'">'+pct+'%</span><small>'+match+' of '+gold.length
+    +' lines have the right speaker vs. your saved key. Line count now: '+lines.length+'.</small>';
+  info.textContent = "Key in use: saved "+store.current.saved
+    + (store.history.length? "  |  "+store.history.length+" older key(s) kept" : "");
+  restoreBtn.style.display = store.history.length ? "inline-block" : "none";
+  restoreBtn.textContent = store.history.length ? "Restore previous key (saved "+store.history[0].saved+")" : "";
+}
+
+function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+/* ---------------- Practice mode: flashcards + voice matching ---------------- */
+let pcCards = [], pcIdx = 0, recog = null;
+const FILLERS = new Set(["uh","um","er","ah","well","like"]);
+const CONTRACTIONS = {"i'm":"i am","don't":"do not","can't":"can not","cannot":"can not",
+  "it's":"it is","that's":"that is","you're":"you are","we're":"we are","he's":"he is",
+  "she's":"she is","won't":"will not","didn't":"did not","wasn't":"was not","isn't":"is not",
+  "ain't":"is not","there's":"there is","what's":"what is","let's":"let us","i'll":"i will",
+  "you'll":"you will","we'll":"we will","i've":"i have","you've":"you have","we've":"we have"};
+const HOMO_CANON = {knot:"not",hear:"here",know:"no",two:"to",too:"to",their:"there",
+  "they're":"there",your:"you're",whose:"who's",its:"it's"};
+
+function togglePractice(){
+  const p = document.getElementById('practicePane');
+  if(p.style.display==="none"){ p.style.display="block"; buildPractice(); }
+  else p.style.display="none";
+}
+
+function buildPractice(){
+  const chars = [...new Set(records.filter(r=>r.kind==="line").map(r=>r.speaker))];
+  const sel = document.getElementById('pcChar');
+  sel.innerHTML = chars.map(c=>'<option>'+escapeHtml(c)+'</option>').join("");
+  startPractice();
+}
+
+function startPractice(){
+  const who = document.getElementById('pcChar').value;
+  pcCards = records.filter(r=>r.kind==="line" && r.speaker===who);
+  pcIdx = 0;
+  showCard();
+}
+
+function showCard(){
+  const c = pcCards[pcIdx];
+  if(!c){ document.getElementById('pcCue').textContent="(no lines found)"; return; }
+  document.getElementById('pcProgress').textContent = "line "+(pcIdx+1)+" of "+pcCards.length;
+  document.getElementById('pcCue').innerHTML = c.cue_speaker
+    ? '<b>'+escapeHtml(c.cue_speaker)+':</b> "'+escapeHtml(c.cue_line)+'"'
+    : '<i>(this is your first line — no cue before it)</i>';
+  document.getElementById('pcResult').innerHTML = "";
+  const t = document.getElementById('pcTyped'); t.value=""; t.focus();
+}
+
+function nextCard(){ pcIdx = (pcIdx+1) % pcCards.length; showCard(); }
+function revealLine(){
+  const c = pcCards[pcIdx];
+  document.getElementById('pcResult').innerHTML =
+    '<p style="margin:0"><b>The line:</b> "'+escapeHtml(c.text)+'"</p>';
+}
+
+function normalize(text){
+  let words = text.toLowerCase().replace(/[^a-z'\s-]/g," ").split(/[\s-]+/).filter(Boolean);
+  words = words.flatMap(w => (CONTRACTIONS[w]||w).split(" "));
+  if(document.getElementById('pcFillers').checked) words = words.filter(w=>!FILLERS.has(w));
+  if(document.getElementById('pcHomo').checked) words = words.map(w=>HOMO_CANON[w]||w);
+  return words;
+}
+
+function wordDiff(said, script){          // LCS over words
+  const m=said.length, n=script.length;
+  const dp = Array.from({length:m+1},()=>new Array(n+1).fill(0));
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++)
+    dp[i][j] = said[i-1]===script[j-1] ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j],dp[i][j-1]);
+  const hitScript = new Array(n).fill(false), hitSaid = new Array(m).fill(false);
+  let i=m, j=n;
+  while(i>0 && j>0){
+    if(said[i-1]===script[j-1]){ hitScript[j-1]=hitSaid[i-1]=true; i--; j--; }
+    else if(dp[i-1][j]>=dp[i][j-1]) i--; else j--;
+  }
+  return {matched: dp[m][n], hitScript, hitSaid};
+}
+
+function gradeAttempt(raw){
+  if(!raw.trim()) return;
+  const c = pcCards[pcIdx];
+  const said = normalize(raw), script = normalize(c.text);
+  const {matched, hitScript, hitSaid} = wordDiff(said, script);
+  const pct = script.length ? Math.round(100*matched/script.length) : 0;
+  const perfT = +document.getElementById('perfT').value, closeT = +document.getElementById('closeT').value;
+  const tier = pct>=perfT ? ["&#10004; Nailed it","var(--ok)"] : pct>=closeT ? ["&#8776; Close — check the exact words","var(--warn)"] : ["&#10008; Not yet","var(--bad)"];
+  const scriptWords = normalize(c.text);
+  const scriptHtml = scriptWords.map((w,k)=>
+    hitScript[k] ? '<span style="color:var(--ok)">'+escapeHtml(w)+'</span>'
+                 : '<span style="color:var(--bad);text-decoration:underline">'+escapeHtml(w)+'</span>').join(" ");
+  const extras = said.filter((w,k)=>!hitSaid[k]);
+  document.getElementById('pcResult').innerHTML =
+    '<p style="margin:0 0 6px;font-size:18px;font-weight:700;color:'+tier[1]+'">'+tier[0]+' <span style="font-size:13px;font-weight:400;color:var(--muted)">('+pct+'% of the script words)</span></p>'
+    +'<p style="margin:0 0 4px"><b>Script says:</b> '+scriptHtml+'</p>'
+    +'<p style="margin:0 0 4px" class="hint"><b>You said:</b> "'+escapeHtml(raw)+'"'
+    +(extras.length? ' — extra words: '+escapeHtml(extras.join(", ")) : '')+'</p>'
+    +'<button class="primary" onclick="nextCard()" style="margin-top:6px">Next line &#9654;</button>';
+}
+
+function listen(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn = document.getElementById('pcMic');
+  if(!SR){
+    document.getElementById('pcResult').innerHTML =
+      '<p class="hint" style="color:var(--warn)">This browser has no speech recognition (or blocks the mic when opened as a file). Use serve_workbench.bat and open http://localhost:8321/workbench.html — or just type your line for now.</p>';
+    return;
+  }
+  try{
+    recog = new SR(); recog.lang="en-US"; recog.interimResults=false; recog.maxAlternatives=1;
+    btn.textContent = "Listening..."; btn.disabled = true;
+    recog.onresult = e => { btn.textContent="🎤 Say your line"; btn.disabled=false;
+      gradeAttempt(e.results[0][0].transcript); };
+    recog.onerror = e => { btn.textContent="🎤 Say your line"; btn.disabled=false;
+      document.getElementById('pcResult').innerHTML =
+        '<p class="hint" style="color:var(--warn)">Mic problem ('+e.error+'). If you opened this file by double-click, the browser blocks the mic — run serve_workbench.bat instead, or type the line.</p>'; };
+    recog.onend = () => { btn.textContent="🎤 Say your line"; btn.disabled=false; };
+    recog.start();
+  }catch(err){ btn.disabled=false; }
+}
+
+/* -------- prototype settings: what the app currently "is" -------- */
+function saveAppSettings(){
+  const s = { perfT:+document.getElementById('perfT').value, closeT:+document.getElementById('closeT').value,
+    fillers:document.getElementById('pcFillers').checked, homo:document.getElementById('pcHomo').checked,
+    mono:+document.getElementById('mono').value, dash:document.getElementById('dash').value,
+    props:document.getElementById('props').value, saved:new Date().toLocaleString() };
+  localStorage.setItem("dexapp_prototype", JSON.stringify(s));
+  showAppSettings();
+}
+function showAppSettings(){
+  const raw = localStorage.getItem("dexapp_prototype");
+  document.getElementById('appSettingsInfo').textContent =
+    raw ? "App prototype settings saved "+JSON.parse(raw).saved : "No prototype saved yet — knobs are just experiments until you save.";
+}
+function loadAppSettings(){
+  const raw = localStorage.getItem("dexapp_prototype");
+  if(raw){ const s = JSON.parse(raw);
+    document.getElementById('perfT').value=s.perfT; document.getElementById('perfV').textContent=s.perfT;
+    document.getElementById('closeT').value=s.closeT; document.getElementById('closeV').textContent=s.closeT;
+    document.getElementById('pcFillers').checked=s.fillers; document.getElementById('pcHomo').checked=s.homo;
+    document.getElementById('mono').value=s.mono; document.getElementById('monoV').textContent=s.mono;
+    document.getElementById('dash').value=s.dash; document.getElementById('props').value=s.props;
+  }
+  showAppSettings();
+}
+loadAppSettings();
+</script>
+</body>
+</html>

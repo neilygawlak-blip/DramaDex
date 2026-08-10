@@ -1,0 +1,452 @@
+[
+ {
+  "line_mid": 8,
+  "t_min": 1.1,
+  "avg_words": 27.4,
+  "hesit_per_line": 0.87,
+  "interrupt_share": 0.13,
+  "q_per_line": 0.27,
+  "women_share": 0.07,
+  "prop_mentions": 4
+ },
+ {
+  "line_mid": 11,
+  "t_min": 2.5,
+  "avg_words": 27.2,
+  "hesit_per_line": 0.87,
+  "interrupt_share": 0.13,
+  "q_per_line": 0.4,
+  "women_share": 0.0,
+  "prop_mentions": 3
+ },
+ {
+  "line_mid": 14,
+  "t_min": 2.7,
+  "avg_words": 54.0,
+  "hesit_per_line": 1.33,
+  "interrupt_share": 0.2,
+  "q_per_line": 1.13,
+  "women_share": 0.0,
+  "prop_mentions": 7
+ },
+ {
+  "line_mid": 17,
+  "t_min": 2.9,
+  "avg_words": 52.1,
+  "hesit_per_line": 1.2,
+  "interrupt_share": 0.07,
+  "q_per_line": 1.2,
+  "women_share": 0.0,
+  "prop_mentions": 7
+ },
+ {
+  "line_mid": 20,
+  "t_min": 4.8,
+  "avg_words": 48.3,
+  "hesit_per_line": 1.0,
+  "interrupt_share": 0.07,
+  "q_per_line": 1.13,
+  "women_share": 0.07,
+  "prop_mentions": 7
+ },
+ {
+  "line_mid": 23,
+  "t_min": 6.9,
+  "avg_words": 48.9,
+  "hesit_per_line": 0.87,
+  "interrupt_share": 0.07,
+  "q_per_line": 1.07,
+  "women_share": 0.07,
+  "prop_mentions": 8
+ },
+ {
+  "line_mid": 26,
+  "t_min": 7.2,
+  "avg_words": 51.2,
+  "hesit_per_line": 0.8,
+  "interrupt_share": 0.07,
+  "q_per_line": 1.07,
+  "women_share": 0.13,
+  "prop_mentions": 10
+ },
+ {
+  "line_mid": 29,
+  "t_min": 7.6,
+  "avg_words": 23.3,
+  "hesit_per_line": 0.27,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.2,
+  "women_share": 0.27,
+  "prop_mentions": 5
+ },
+ {
+  "line_mid": 32,
+  "t_min": 7.9,
+  "avg_words": 14.9,
+  "hesit_per_line": 0.2,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.33,
+  "women_share": 0.33,
+  "prop_mentions": 5
+ },
+ {
+  "line_mid": 35,
+  "t_min": 8.3,
+  "avg_words": 14.1,
+  "hesit_per_line": 0.27,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.33,
+  "women_share": 0.4,
+  "prop_mentions": 4
+ },
+ {
+  "line_mid": 38,
+  "t_min": 8.6,
+  "avg_words": 15.7,
+  "hesit_per_line": 0.27,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.4,
+  "women_share": 0.47,
+  "prop_mentions": 2
+ },
+ {
+  "line_mid": 41,
+  "t_min": 8.7,
+  "avg_words": 15.4,
+  "hesit_per_line": 0.27,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.27,
+  "women_share": 0.47,
+  "prop_mentions": 0
+ },
+ {
+  "line_mid": 44,
+  "t_min": 9.0,
+  "avg_words": 16.5,
+  "hesit_per_line": 0.2,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.27,
+  "women_share": 0.53,
+  "prop_mentions": 1
+ },
+ {
+  "line_mid": 47,
+  "t_min": 9.6,
+  "avg_words": 21.3,
+  "hesit_per_line": 0.13,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.13,
+  "women_share": 0.67,
+  "prop_mentions": 7
+ },
+ {
+  "line_mid": 50,
+  "t_min": 9.8,
+  "avg_words": 29.1,
+  "hesit_per_line": 0.13,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.2,
+  "women_share": 0.73,
+  "prop_mentions": 10
+ },
+ {
+  "line_mid": 53,
+  "t_min": 10.6,
+  "avg_words": 25.7,
+  "hesit_per_line": 0.13,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.33,
+  "women_share": 0.87,
+  "prop_mentions": 10
+ },
+ {
+  "line_mid": 56,
+  "t_min": 11.3,
+  "avg_words": 24.9,
+  "hesit_per_line": 0.13,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.33,
+  "women_share": 1.0,
+  "prop_mentions": 13
+ },
+ {
+  "line_mid": 59,
+  "t_min": 11.7,
+  "avg_words": 24.5,
+  "hesit_per_line": 0.2,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.33,
+  "women_share": 1.0,
+  "prop_mentions": 13
+ },
+ {
+  "line_mid": 62,
+  "t_min": 11.9,
+  "avg_words": 24.1,
+  "hesit_per_line": 0.2,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.27,
+  "women_share": 1.0,
+  "prop_mentions": 9
+ },
+ {
+  "line_mid": 65,
+  "t_min": 12.4,
+  "avg_words": 18.2,
+  "hesit_per_line": 0.13,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.33,
+  "women_share": 1.0,
+  "prop_mentions": 9
+ },
+ {
+  "line_mid": 68,
+  "t_min": 13.1,
+  "avg_words": 22.7,
+  "hesit_per_line": 0.13,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.2,
+  "women_share": 0.87,
+  "prop_mentions": 11
+ },
+ {
+  "line_mid": 71,
+  "t_min": 13.4,
+  "avg_words": 24.1,
+  "hesit_per_line": 0.13,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.27,
+  "women_share": 0.87,
+  "prop_mentions": 9
+ },
+ {
+  "line_mid": 74,
+  "t_min": 13.8,
+  "avg_words": 22.0,
+  "hesit_per_line": 0.07,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.33,
+  "women_share": 0.87,
+  "prop_mentions": 9
+ },
+ {
+  "line_mid": 77,
+  "t_min": 14.5,
+  "avg_words": 20.9,
+  "hesit_per_line": 0.07,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.47,
+  "women_share": 0.87,
+  "prop_mentions": 8
+ },
+ {
+  "line_mid": 80,
+  "t_min": 14.7,
+  "avg_words": 21.1,
+  "hesit_per_line": 0.13,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.4,
+  "women_share": 0.87,
+  "prop_mentions": 7
+ },
+ {
+  "line_mid": 83,
+  "t_min": 14.8,
+  "avg_words": 20.6,
+  "hesit_per_line": 0.2,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.4,
+  "women_share": 1.0,
+  "prop_mentions": 7
+ },
+ {
+  "line_mid": 86,
+  "t_min": 15.3,
+  "avg_words": 18.1,
+  "hesit_per_line": 0.2,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.4,
+  "women_share": 1.0,
+  "prop_mentions": 7
+ },
+ {
+  "line_mid": 89,
+  "t_min": 15.9,
+  "avg_words": 18.3,
+  "hesit_per_line": 0.2,
+  "interrupt_share": 0.0,
+  "q_per_line": 0.33,
+  "women_share": 1.0,
+  "prop_mentions": 6
+ },
+ {
+  "line_mid": 92,
+  "t_min": 16.3,
+  "avg_words": 20.6,
+  "hesit_per_line": 0.53,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.27,
+  "women_share": 1.0,
+  "prop_mentions": 6
+ },
+ {
+  "line_mid": 95,
+  "t_min": 16.5,
+  "avg_words": 21.4,
+  "hesit_per_line": 0.6,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.27,
+  "women_share": 1.0,
+  "prop_mentions": 4
+ },
+ {
+  "line_mid": 98,
+  "t_min": 16.9,
+  "avg_words": 22.1,
+  "hesit_per_line": 0.73,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.4,
+  "women_share": 1.0,
+  "prop_mentions": 4
+ },
+ {
+  "line_mid": 101,
+  "t_min": 17.7,
+  "avg_words": 26.1,
+  "hesit_per_line": 1.2,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.53,
+  "women_share": 1.0,
+  "prop_mentions": 5
+ },
+ {
+  "line_mid": 104,
+  "t_min": 18.3,
+  "avg_words": 27.3,
+  "hesit_per_line": 1.4,
+  "interrupt_share": 0.13,
+  "q_per_line": 0.53,
+  "women_share": 1.0,
+  "prop_mentions": 9
+ },
+ {
+  "line_mid": 107,
+  "t_min": 18.7,
+  "avg_words": 21.4,
+  "hesit_per_line": 1.27,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.47,
+  "women_share": 1.0,
+  "prop_mentions": 9
+ },
+ {
+  "line_mid": 110,
+  "t_min": 19.3,
+  "avg_words": 18.7,
+  "hesit_per_line": 1.2,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.53,
+  "women_share": 0.87,
+  "prop_mentions": 11
+ },
+ {
+  "line_mid": 113,
+  "t_min": 19.4,
+  "avg_words": 14.5,
+  "hesit_per_line": 1.07,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.4,
+  "women_share": 0.8,
+  "prop_mentions": 11
+ },
+ {
+  "line_mid": 116,
+  "t_min": 19.6,
+  "avg_words": 14.2,
+  "hesit_per_line": 1.07,
+  "interrupt_share": 0.13,
+  "q_per_line": 0.2,
+  "women_share": 0.73,
+  "prop_mentions": 12
+ },
+ {
+  "line_mid": 119,
+  "t_min": 19.7,
+  "avg_words": 13.2,
+  "hesit_per_line": 0.93,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.2,
+  "women_share": 0.73,
+  "prop_mentions": 10
+ },
+ {
+  "line_mid": 122,
+  "t_min": 20.1,
+  "avg_words": 15.3,
+  "hesit_per_line": 0.67,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.2,
+  "women_share": 0.73,
+  "prop_mentions": 10
+ },
+ {
+  "line_mid": 125,
+  "t_min": 20.6,
+  "avg_words": 17.4,
+  "hesit_per_line": 0.8,
+  "interrupt_share": 0.13,
+  "q_per_line": 0.13,
+  "women_share": 0.87,
+  "prop_mentions": 9
+ },
+ {
+  "line_mid": 128,
+  "t_min": 20.9,
+  "avg_words": 20.5,
+  "hesit_per_line": 0.8,
+  "interrupt_share": 0.13,
+  "q_per_line": 0.13,
+  "women_share": 0.93,
+  "prop_mentions": 7
+ },
+ {
+  "line_mid": 131,
+  "t_min": 21.3,
+  "avg_words": 23.7,
+  "hesit_per_line": 0.8,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.13,
+  "women_share": 1.0,
+  "prop_mentions": 8
+ },
+ {
+  "line_mid": 134,
+  "t_min": 21.8,
+  "avg_words": 27.1,
+  "hesit_per_line": 0.93,
+  "interrupt_share": 0.13,
+  "q_per_line": 0.2,
+  "women_share": 0.8,
+  "prop_mentions": 6
+ },
+ {
+  "line_mid": 137,
+  "t_min": 22.7,
+  "avg_words": 27.5,
+  "hesit_per_line": 1.0,
+  "interrupt_share": 0.13,
+  "q_per_line": 0.33,
+  "women_share": 0.67,
+  "prop_mentions": 7
+ },
+ {
+  "line_mid": 140,
+  "t_min": 23.1,
+  "avg_words": 25.3,
+  "hesit_per_line": 0.8,
+  "interrupt_share": 0.07,
+  "q_per_line": 0.27,
+  "women_share": 0.47,
+  "prop_mentions": 6
+ }
+]
