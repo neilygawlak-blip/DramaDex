@@ -53,6 +53,20 @@ def levenshtein(a, b):
     return prev[-1]
 
 
+def nearest_cast(name, cast):
+    """Nearest cast member to a read name, and whether it is near enough."""
+    up = name.upper().strip(" .:")
+    best, best_d = None, 99
+    for c in cast:
+        d = levenshtein(up, c.upper())
+        if d < best_d:
+            best, best_d = c, d
+    # Short names get a tight budget, since two letters out of four is not a
+    # misread, it is a different word.
+    limit = 1 if len(up) <= 4 else (2 if len(up) <= 8 else 3)
+    return best, best_d, best_d <= limit
+
+
 def snap_to_cast(name, cast):
     """Pull a misread speaker name onto the nearest real one from the cast list.
 
@@ -62,16 +76,49 @@ def snap_to_cast(name, cast):
     """
     if not cast:
         return name, False
+    best, _, near = nearest_cast(name, cast)
     up = name.upper().strip(" .:")
-    best, best_d = None, 99
-    for c in cast:
-        d = levenshtein(up, c.upper())
-        if d < best_d:
-            best, best_d = c, d
-    limit = 1 if len(up) <= 4 else (2 if len(up) <= 8 else 3)
-    if best and best_d <= limit and best.upper() != up:
+    if near and best.upper() != up:
         return best, True
-    return (best if best and best.upper() == up else name), False
+    return (best if near else name), False
+
+
+def detect_speech(line, cast):
+    """Does this line open a speech, and by whom?
+
+    The all-caps pattern alone is not enough for a real acting edition. Names
+    are set in small caps, which OCR reports as `Miss SKILLON` about as often
+    as `MISS SKILLON`, and a speech whose name is not recognised gets welded
+    onto the end of the speech before it.
+
+    So when a cast list is supplied the name is what is matched, not its case.
+    Every period and colon near the head of the line is tried as the divider,
+    because a misread name can carry a period inside it (MISS SEII.LON), and
+    the longest name that lands on the cast wins so that MISS SKILLON is not
+    settled by its first word.
+    """
+    if not cast:
+        m = SPEAKER_RE.match(line)
+        if m:
+            raw = m.group(1).strip(" .:")
+            return raw, raw
+        return None
+
+    head = line[:46]
+    best = None
+    for m in re.finditer(r"[.:]", head):
+        raw = head[:m.start()]
+        core = re.sub(r"\s*\([^)]*\)\s*$", "", raw).strip()
+        core = core.strip(" .,:;'\"")
+        if len(core) < 2 or not line.startswith(core):
+            continue
+        # The rest of the line has to look like speech, not a page of prose.
+        if not line[m.end():].strip():
+            continue
+        cand, dist, near = nearest_cast(core, cast)
+        if near and (best is None or len(core) > len(best[1])):
+            best = (cand, core)
+    return best
 
 
 def fit_skew(lines):
@@ -171,34 +218,30 @@ def assemble(lines, cast=None):
             })
 
     paras, pmeta = [], []
-    buf, buf_page, buf_file = "", None, None
+    buf, buf_page, buf_file, buf_speech = "", None, None, None
     starts_by_speaker = 0
     speakers = Counter()
     snapped = []
 
     def flush():
-        nonlocal buf, buf_page, buf_file
+        nonlocal buf, buf_page, buf_file, buf_speech
         if buf.strip():
             text = fix_ocr_confusions(re.sub(r"\s+", " ", buf).strip())
-            sp = SPEAKER_RE.match(text)
-            if sp:
-                raw = sp.group(1).strip(" .:")
-                fixed, changed = snap_to_cast(raw, cast)
-                if changed:
-                    text = fixed + text[len(sp.group(1)):]
-                    snapped.append((raw, fixed))
-                    speakers[fixed] += 1
-                else:
-                    speakers[raw] += 1
+            if buf_speech:
+                canon, raw = buf_speech
+                if text.startswith(raw) and canon.upper() != raw.upper():
+                    text = canon + text[len(raw):]
+                    snapped.append((raw, canon))
+                speakers[canon] += 1
             paras.append(text)
             pmeta.append((buf_page, buf_file))
-        buf, buf_page, buf_file = "", None, None
+        buf, buf_page, buf_file, buf_speech = "", None, None, None
 
     for m in marked:
         t = m["text"]
         if not t:
             continue
-        sp = SPEAKER_RE.match(t)
+        sp = detect_speech(t, cast)
         if sp:
             new_para = True
             starts_by_speaker += 1
@@ -214,7 +257,7 @@ def assemble(lines, cast=None):
 
         if new_para:
             flush()
-            buf, buf_page, buf_file = t, m["page"], m["file"]
+            buf, buf_page, buf_file, buf_speech = t, m["page"], m["file"], sp
         elif buf.endswith("-") and not buf.endswith("--"):
             buf = buf[:-1] + t          # word split across two lines
         else:

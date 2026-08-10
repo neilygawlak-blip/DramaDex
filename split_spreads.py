@@ -30,6 +30,55 @@ EXT = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff")
 GUTTER_TRIM = 0.012
 
 
+def lie_of_the_type(img):
+    """How strongly the type stripes down the page against across it.
+
+    Above 1 means the lines of type are running down the image, so it is lying
+    sideways. Below 1 means it is upright.
+
+    The phone's EXIF orientation tag describes how the phone was held, not how
+    the page was lying. Trusting it turned readable pages into 7 words of
+    nonsense, so it is ignored and the type itself is asked instead.
+
+    Text makes a striped pattern: dark line, pale gap, dark line. That striping
+    shows up as a spiky brightness profile along the axis across the lines and
+    a flat one along the axis they run in, so whichever profile is spikier
+    tells us which way the type is lying. It settles upright against sideways.
+    Upside down looks identical to upright by this test, and is left alone,
+    because a page photographed on a table is rarely inverted and OCR reporting
+    almost no words would show it up anyway.
+
+    A cover or a title page has too little type to read this way, which is why
+    the caller decides once for a whole batch rather than photo by photo.
+    """
+    g = np.asarray(img.convert("L"), dtype=np.float32)
+    h, w = g.shape
+    step = max(1, int(max(h, w) / 900))
+    g = g[::step, ::step]
+    g = g - g.mean()
+
+    spikes = []
+    for prof in (g.mean(axis=1), g.mean(axis=0)):
+        n = len(prof)
+        k = max(3, n // 20)
+        # Take the slow part out of the profile first. Uneven lighting and the
+        # fold shadow are slow and wide; type striping is fast and narrow.
+        # Without this the fold on its own can read as a page lying sideways.
+        smooth = np.convolve(prof, np.ones(k) / k, mode="same")
+        # The derivative of what is left: how sharply brightness changes line
+        # to line. Striped type swings hard, an even page barely moves.
+        spikes.append(float(np.abs(np.diff(prof - smooth)).mean()))
+    row_spike, col_spike = spikes
+    return col_spike / row_spike if row_spike > 1e-6 else 0.0
+
+
+# Photographed script pages read about 0.78 upright and about 1.32 lying
+# sideways. The line sits in that gap. If it ever calls a batch wrong the
+# failure is loud rather than subtle, because OCR on sideways type returns
+# almost no words, and --turn or --no-turn overrides it.
+SIDEWAYS = 1.20
+
+
 def find_gutter(img):
     """Return the x of the fold, and whether it was actually detected."""
     g = np.asarray(img.convert("L"), dtype=np.float32)
@@ -52,8 +101,10 @@ def find_gutter(img):
     return (x if found else w // 2), found
 
 
-def split_image(path, outdir, index):
+def split_image(path, outdir, index, turn):
     img = Image.open(path)
+    if turn:
+        img = img.rotate(90, expand=True)
     w, h = img.size
     x, found = find_gutter(img)
     trim = int(w * GUTTER_TRIM)
@@ -71,6 +122,13 @@ def split_image(path, outdir, index):
 def main():
     argv = sys.argv[1:]
     start = 1
+    force_turn = None
+    if "--turn" in argv:
+        force_turn = True
+        argv.remove("--turn")
+    if "--no-turn" in argv:
+        force_turn = False
+        argv.remove("--no-turn")
     if "--start" in argv:
         i = argv.index("--start")
         start = int(argv[i + 1])
@@ -87,15 +145,24 @@ def main():
         print("No images in %s" % src)
         return 1
 
+    # Decide the orientation once, from the middle of the batch's readings, so
+    # a cover or a near-blank page cannot drag the rest the wrong way up.
+    ratios = sorted(lie_of_the_type(Image.open(os.path.join(src, f))) for f in shots)
+    middle = ratios[len(ratios) // 2]
+    turn = middle > SIDEWAYS
+    if force_turn is not None:
+        turn = force_turn
+        print("orientation forced: %s" % ("turning every photo" if turn else "leaving as shot"))
+    else:
+        print("type reads %s (middle of batch %.2f, sideways above %.2f)%s"
+              % ("sideways" if turn else "upright", middle, SIDEWAYS,
+                 ", turning every photo" if turn else ""))
+
     index = start
     guessed = []
-    portrait = []
     for f in shots:
         path = os.path.join(src, f)
-        found, x, w = split_image(path, dst, index)
-        img_w, img_h = Image.open(path).size
-        if img_h > img_w:
-            portrait.append(f)
+        found, x, w = split_image(path, dst, index, turn)
         if not found:
             guessed.append(f)
         print("%-22s -> page_%03d + page_%03d   fold at x=%d of %d%s"
@@ -103,10 +170,6 @@ def main():
         index += 2
 
     print("\n%d spreads -> %d pages in %s" % (len(shots), index - start, dst))
-    if portrait:
-        print("\nTaller than they are wide, so probably single pages, not spreads: %s"
-              % ", ".join(portrait[:6]))
-        print("Those should go straight to OCR without being split.")
     if guessed:
         print("\nNo clear fold shadow found, split down the middle instead: %s"
               % ", ".join(guessed[:6]))
