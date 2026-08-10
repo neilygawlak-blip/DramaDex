@@ -5,13 +5,20 @@
 <title>DramaDex Workbench</title>
 <style>
   :root { --ink:#222; --muted:#777; --bg:#faf9f6; --card:#fff; --line:#e4e1da;
-          --accent:#6a4fb3; --ok:#1d7a4f; --warn:#b58900; --bad:#b3403a; }
+          --accent:#6a4fb3; --ok:#1d7a4f; --warn:#b58900; --bad:#b3403a;
+          --soft:#f7f6f2; --unsure:#fdf3d7; --dirbg:#f5f4f0; --headbg:#efeae0;
+          --accent-soft:#d8cef0; --helpbg:#f3effc; --barbg:#fbfaf7; }
+  :root[data-theme="dark"] { --ink:#e8e6e0; --muted:#9a988f; --bg:#171716; --card:#232322;
+          --line:#3a3a37; --accent:#a493e6; --ok:#4fc48c; --warn:#e0b34a; --bad:#e07570;
+          --soft:#2b2b29; --unsure:#4a3f1c; --dirbg:#262624; --headbg:#33302a;
+          --accent-soft:#4a3f70; --helpbg:#2a2438; --barbg:#1e1e1d; }
+  button, select, input, textarea { color:var(--ink); background:var(--card); }
   * { box-sizing:border-box; }
   body { margin:0; font:15px/1.5 "Segoe UI", system-ui, sans-serif; color:var(--ink); background:var(--bg); }
   header { padding:14px 20px 10px; border-bottom:1px solid var(--line); background:var(--card); }
   header h1 { margin:0; font-size:20px; font-weight:600; }
   header p { margin:2px 0 0; color:var(--muted); font-size:13px; }
-  #help { background:#f3effc; border:1px solid #d8cef0; border-radius:8px; margin:12px 20px; padding:12px 16px; font-size:14px; }
+  #help { background:var(--helpbg); border:1px solid var(--accent-soft); border-radius:8px; margin:12px 20px; padding:12px 16px; font-size:14px; }
   #help ol { margin:6px 0 4px; padding-left:22px; }
   #help li { margin:3px 0; }
   #toolbar { display:flex; gap:10px; align-items:center; padding:10px 20px; flex-wrap:wrap; }
@@ -28,13 +35,13 @@
   #sidebar section { padding:10px 14px; border-bottom:1px solid var(--line); }
   #sidebar h3 { margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
   .row { display:block; padding:5px 8px; border-radius:6px; margin:2px 0; cursor:pointer; }
-  .row:hover { outline:2px solid #d8cef0; }
+  .row:hover { outline:2px solid var(--accent-soft); }
   .row.sel { outline:2px solid var(--accent); }
   .row .who { font-weight:700; color:var(--accent); margin-right:6px; }
   .row .dir { color:var(--muted); font-style:italic; }
-  .row.direction { color:var(--muted); font-style:italic; background:#f5f4f0; }
-  .row.heading { font-weight:700; text-align:center; background:#efeae0; }
-  .row.unsure { background:#fdf3d7; }
+  .row.direction { color:var(--muted); font-style:italic; background:var(--dirbg); }
+  .row.heading { font-weight:700; text-align:center; background:var(--headbg); }
+  .row.unsure { background:var(--unsure); }
   .row .prop { border-bottom:2px solid #8fce9f; }
   .badge { display:inline-block; font-size:11px; padding:1px 7px; border-radius:9px; margin-left:6px; vertical-align:1px; }
   .badge.mono { background:#fde3e1; color:var(--bad); }
@@ -44,7 +51,7 @@
   label { display:block; font-size:13px; margin:10px 0 2px; color:var(--ink); }
   input[type=range] { width:100%; }
   textarea, input[type=text] { width:100%; font:13px monospace; border:1px solid var(--line); border-radius:6px; padding:6px; }
-  #detail pre { font:12px/1.5 Consolas, monospace; white-space:pre-wrap; background:#f7f6f2;
+  #detail pre { font:12px/1.5 Consolas, monospace; white-space:pre-wrap; background:var(--soft);
                 border-radius:6px; padding:8px; margin:0; max-height:300px; overflow-y:auto; }
   table.stats { width:100%; font-size:13px; border-collapse:collapse; }
   table.stats td { padding:2px 4px; border-bottom:1px dotted var(--line); }
@@ -53,7 +60,7 @@
   #pastebox { display:none; padding:10px 20px; }
   #pastebox textarea { height:140px; }
   #filterbar { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 14px;
-               border-bottom:1px solid var(--line); background:#fbfaf7; font-size:13px; }
+               border-bottom:1px solid var(--line); background:var(--barbg); font-size:13px; }
   .chip { padding:3px 10px; border:1px solid var(--line); border-radius:12px; cursor:pointer;
           background:var(--card); font-size:12px; user-select:none; }
   .chip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
@@ -64,9 +71,12 @@
 </head>
 <body>
 
-<header>
-  <h1>DramaDex Workbench</h1>
-  <p>Feed it a play &rarr; see what the parser understood &rarr; turn the knobs &rarr; watch the score. Nothing leaves this computer.</p>
+<header style="display:flex;align-items:center;gap:16px">
+  <div style="flex:1">
+    <h1>DramaDex Workbench</h1>
+    <p>Feed it a play &rarr; see what the parser understood &rarr; turn the knobs &rarr; watch the score. Nothing leaves this computer.</p>
+  </div>
+  <button id="themeBtn" onclick="toggleTheme()" title="Switch light/dark">&#127769; Dark</button>
 </header>
 
 <div id="help">
@@ -104,7 +114,7 @@
     <span style="flex:1"></span>
     <button onclick="togglePractice()">Close</button>
   </div>
-  <div id="pcCard" style="background:#f7f6f2;border-radius:8px;padding:14px 16px;">
+  <div id="pcCard" style="background:var(--soft);border-radius:8px;padding:14px 16px;">
     <p class="hint" style="margin:0 0 4px">Your cue:</p>
     <p id="pcCue" style="margin:0 0 12px;font-size:16px"></p>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -1943,6 +1953,19 @@ function loadAppSettings(){
   showAppSettings();
 }
 loadAppSettings();
+
+/* -------- theme -------- */
+function applyTheme(t){
+  document.documentElement.setAttribute("data-theme", t);
+  document.getElementById('themeBtn').innerHTML = t==="dark" ? "&#9728;&#65039; Light" : "&#127769; Dark";
+}
+function toggleTheme(){
+  const t = document.documentElement.getAttribute("data-theme")==="dark" ? "light" : "dark";
+  localStorage.setItem("dex_theme", t);
+  applyTheme(t);
+}
+applyTheme(localStorage.getItem("dex_theme")
+  || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
 </script>
 </body>
 </html>
