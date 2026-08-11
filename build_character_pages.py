@@ -22,8 +22,10 @@ How a page runs, per the prototype spec (Aug 2026):
     stage direction when the script gives one (angrily, laughing,
     nervously, hurriedly...). A plain line gets the neutral smile: when we
     don't really know, we don't pretend to.
-  - Feedback is three emoji tiers, scored forgivingly on a word diff:
-    nailed it / close / not yet. Type-to-answer is the fallback when the
+  - Feedback is the word diff itself, plus one celebration: "Nailed it"
+    at 90%+, otherwise no verdict at all (Chris's call, Aug 2026 --
+    the unlit words already say what was missed, and actors know when
+    they're not close). Type-to-answer is the fallback when the
     browser refuses the mic (file:// pages cannot use it; localhost can).
 
 Usage:
@@ -379,14 +381,6 @@ TEMPLATE = """<!DOCTYPE html>
       animation:fill linear forwards;animation-play-state:paused}
  @keyframes fill{to{width:100%}}
  .listening{color:#7fe0a7;font-weight:bold}
- #againbtn{border:none;background:none;cursor:pointer;color:#ffd75e;
-      font-size:.8rem;display:inline-flex;align-items:center;gap:.35rem;
-      margin-left:.6rem;vertical-align:middle;padding:0}
- #againbtn svg{width:1.5rem;height:1.5rem;transform:rotate(-90deg)}
- #againbtn .rbg{fill:none;stroke:#2b3a5e;stroke-width:3}
- #againbtn .rfg{fill:none;stroke:#ffd75e;stroke-width:3;
-      stroke-dasharray:63;stroke-dashoffset:0;animation:ring 1s linear forwards}
- @keyframes ring{to{stroke-dashoffset:63}}
  #backbtn{position:fixed;bottom:1.2rem;left:1.2rem;font-size:.75rem;
       color:#7d87a3;background:#0d1526;border:1px solid #2b3a5e;
       border-radius:999px;padding:.35rem .8rem;text-decoration:none;
@@ -554,7 +548,10 @@ function grade(expected,heard){
  const E=norm(expected).split(" ").filter(w=>w),H=norm(heard).split(" ").filter(w=>!FILLERS.has(w));
  const S=soundSets(H);let hit=0;const marks=E.map(w=>{const ok=wordOk(w,S);if(ok)hit++;return {w,ok};});
  const r=E.length?hit/E.length:1;
- return {tier:r>=.9?"\\u{1F3AF} Nailed it":r>=.65?"\\u{1F642} Close":"\\u{1F501} Not yet",marks,r};
+ // One tier or silence, by Chris's call: the unlit words already say
+ // exactly what was missed, and a verdict under that is just noise.
+ // Nailed it is the only thing worth announcing.
+ return {tier:r>=.9?"\\u{1F3AF} Nailed it":"",marks,r};
 }
 
 // ---- the run loop ----
@@ -764,15 +761,9 @@ function judged(l,text){
  lightUp(text);
  my.textContent="";
  const t=token;
- // After any completion: a one-second ring, then straight on. Tapping
- // the ring ("Again") replays this line instead.
- const b=document.createElement("button");b.id="againbtn";
- b.innerHTML='<svg viewBox="0 0 24 24"><circle class="rbg" cx="12" cy="12" r="10"/>'+
-  '<circle class="rfg" cx="12" cy="12" r="10"/></svg>Again';
- v.appendChild(b);
- const go=setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},1000);
- b.onclick=()=>{clearTimeout(go);
-  if(t===token&&running&&!paused){token++;setTimeout(step,100);}};
+ // A beat to read the verdict, then straight on. The left arrow is the
+ // way back when a line deserves another pass.
+ setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},1000);
 }
 
 function lev(a,b){if(a===b)return 0;let p=[...Array(b.length+1).keys()];

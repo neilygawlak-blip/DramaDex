@@ -6,7 +6,7 @@ An all-in-one play rehearsal app. It dissects a script into structured data (cha
 
 - **No LLM anywhere in the app.** Rule-based parsing, on-device speech recognition, algorithmic scoring, curated content. This is a deliberate product decision (offline, zero per-use cost, publisher-friendly).
 - **Completely offline.** Any ML capability ships as a small on-device module (Tesseract.js for OCR, Vosk/Whisper-tiny WASM candidates for speech, Piper/speechSynthesis for TTS).
-- **Scoring must be forgiving.** Tiers (nailed it / close / not yet), never harsh exact-match. Trust in fair scoring is the product's core asset.
+- **Scoring must be forgiving.** The word diff IS the feedback; the only verdict is "Nailed it" at 90%+, otherwise silence (Aug 2026 — "close" and "not yet" were cut: the unlit words already say what was missed, actors know when they're not close, and fewer verdicts feels like more control). Never harsh exact-match. Trust in fair scoring is the product's core asset.
 
 ## Current state (Aug 2026)
 
