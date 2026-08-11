@@ -140,6 +140,80 @@ def speakable(say):
     return re.sub(r"\s+", " ", t).strip()
 
 
+def median_f0(ff, path):
+    """Median voice frequency of a clip, via torchaudio's pitch
+    detector, gated to frames that carry real energy."""
+    import wave
+
+    import numpy as np
+    import torch
+    import torchaudio.functional as AF
+
+    sr = 16000
+    tmp = path + ".f0.wav"
+    run([ff, "-y", "-v", "error", "-i", path,
+         "-ar", str(sr), "-ac", "1", tmp])
+    with wave.open(tmp) as w:
+        x = (np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16)
+             .astype(np.float32) / 32768.0)
+    os.remove(tmp)
+    if len(x) < sr // 4:
+        return 0
+    p = AF.detect_pitch_frequency(torch.from_numpy(x)[None, :], sr,
+                                  freq_low=60, freq_high=400)[0]
+    hop = len(x) // max(1, p.shape[-1])
+    rms = np.array([np.sqrt(np.mean(x[i * hop:(i + 1) * hop] ** 2))
+                    for i in range(p.shape[-1])])
+    voiced = p[torch.from_numpy(rms > .25 * rms.max())]
+    return float(voiced.median()) if len(voiced) else 0
+
+
+def drift_patrol(tts, ff, ref, outdir, says, speed):
+    """The judgment pass: F5 occasionally drifts a short shouty line
+    into a different voice entirely. Every clip's pitch is measured
+    against the batch's own register (each actor is their own norm), and
+    an off-register clip is rerolled on fresh seeds -- with the
+    exclamation marks calmed to periods as the last resort, which
+    reliably talks the model down.
+    """
+    import random
+    import statistics
+
+    clips = {f[:-4]: os.path.join(outdir, f)
+             for f in os.listdir(outdir) if f.endswith(".mp3")}
+    f0s = {lid: median_f0(ff, p) for lid, p in clips.items()}
+    med = statistics.median(v for v in f0s.values() if v)
+    # A drifted clip is a different VOICE (roughly half or double the
+    # register), not an excited one: shouted lines legitimately run
+    # half again over the median and must not be "fixed".
+    in_register = lambda v: .55 <= v / med <= 1.7
+    off = {lid for lid, v in f0s.items()
+           if v and lid in says and not in_register(v)}
+    print("register %d Hz; %d clip(s) off-register" % (med, len(off)))
+    tmp = os.path.join(outdir, "_reroll.wav")
+    for lid in sorted(off):
+        texts = [speakable(says[lid])] * 3 + \
+                [speakable(says[lid]).replace("!", ".")] * 3
+        best_f, best = f0s[lid], open(clips[lid], "rb").read()
+        for t, gen in enumerate(texts, 1):
+            tts.infer(ref_file=ref, ref_text="", gen_text=gen,
+                      file_wave=tmp, speed=speed, remove_silence=True,
+                      seed=random.randint(0, 2**31 - 1))
+            mp3_out(ff, tmp, clips[lid])
+            f = median_f0(ff, clips[lid])
+            if f and abs(f - med) < abs(best_f - med):
+                best_f, best = f, open(clips[lid], "rb").read()
+            if f and in_register(f):
+                break
+        with open(clips[lid], "wb") as fh:
+            fh.write(best)
+        print("  %s: %d -> %d Hz after %d tr%s  %.40s"
+              % (lid, f0s[lid], best_f, t, "y" if t == 1 else "ies",
+                 says[lid]))
+    if os.path.exists(tmp):
+        os.remove(tmp)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("who", help="character name, e.g. MAN")
@@ -149,6 +223,9 @@ def main():
                          "(default: Whisper-transcribe the kept audio)")
     ap.add_argument("--speed", type=float, default=1.0,
                     help="rendered speaking speed, 1.0 = as the reference")
+    ap.add_argument("--only", default="",
+                    help="re-render only lines whose id or text contains "
+                         "this (a reroll: each render draws a new seed)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
@@ -185,11 +262,18 @@ def main():
     ref, stats = max(survivors, key=lambda x: x[1]["secs"])
     print("reference: %s (%.1fs)" % (stats["src"], stats["secs"]))
 
-    todo = []
+    todo, seen = [], set()
     for s in speeches:
         lid = line_id(who, s["say"])
+        if lid in seen:
+            continue
+        seen.add(lid)
         dest = os.path.join(outdir, lid + ".mp3")
-        if args.force or not os.path.exists(dest):
+        if args.only:
+            if (args.only.lower() in lid
+                    or args.only.lower() in s["say"].lower()):
+                todo.append((lid, s["say"], dest))
+        elif args.force or not os.path.exists(dest):
             todo.append((lid, s["say"], dest))
     print("%d lines total for %s, %d to render" %
           (len(speeches), who, len(todo)))
@@ -229,6 +313,9 @@ def main():
                   speed=args.speed, remove_silence=True)
         mp3_out(ff, tmp_wav, dest)
         print("  %4d/%d  %s  %.48s" % (n, len(todo), lid, say))
+
+    says = {line_id(who, s["say"]): s["say"] for s in speeches}
+    drift_patrol(tts, ff, ref, outdir, says, args.speed)
 
     manifest_path = os.path.join(VOICES, "manifest.json")
     manifest = {}

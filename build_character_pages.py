@@ -148,6 +148,28 @@ VOICE_PROFILES = {
     "CHOIRBOY":     {"g": "m", "style": "casual", "mult": 1.0},
 }
 
+# A "(together, with X)" direction marks simultaneous dialogue: the fix
+# pipeline splits the joint speech into one per speaker, adjacent in the
+# text. Adjacent marked speeches form one group; they are spoken at the
+# same moment, not in sequence.
+TOGETHER_RE = re.compile(r"\(together\b", re.I)
+
+
+def tag_together(speeches):
+    gid, i = 0, 0
+    while i < len(speeches):
+        j = i
+        while (speeches[j]["speaker"] and TOGETHER_RE.search(speeches[j]["text"])
+               and j + 1 < len(speeches) and speeches[j + 1]["speaker"]
+               and TOGETHER_RE.search(speeches[j + 1]["text"])):
+            j += 1
+        if j > i:
+            gid += 1
+            for k in range(i, j + 1):
+                speeches[k]["gid"] = gid
+        i = j + 1
+
+
 SFX_RE = [
     ("doorbell", re.compile(r"DOORBELL|DOOR-BELL|front door bell", re.I)),
     ("phone", re.compile(r"TELEPHONE rings|'phone rings|PHONE-BELL", re.I)),
@@ -216,6 +238,7 @@ def parse(rawfile, cast):
             "sfx": sfx,
         })
     number_pages(speeches)
+    tag_together(speeches)
     return speeches
 
 
@@ -270,9 +293,13 @@ def runs_for(speeches, name):
 
 
 def cue_for(speeches, i):
-    """The line before theirs: who says it and its tail end."""
+    """The line before theirs: who says it and its tail end. A together
+    partner is not a cue: both react to whatever preceded the group."""
     for j in range(i - 1, -1, -1):
         s = speeches[j]
+        if (speeches[i].get("gid")
+                and s.get("gid") == speeches[i]["gid"]):
+            continue
         if s["speaker"] and s["say"]:
             tail = s["say"]
             if len(tail) > 160:
@@ -341,6 +368,16 @@ TEMPLATE = """<!DOCTYPE html>
       box-shadow:0 2px 10px rgba(0,0,0,.6),0 0 8px rgba(255,183,71,.2)}
  .star{cursor:pointer;border:none;background:none;font-size:1.1rem}
  #mystate{font-size:.85rem;color:#7d87a3}
+ .simchip{display:inline-block;font-size:.72rem;padding:.1rem .55rem;margin-left:.5rem;
+      border:1px solid #ffd75e;border-radius:999px;color:#ffd75e;vertical-align:middle;
+      text-shadow:0 0 6px rgba(255,183,71,.5)}
+ .simline{margin-top:.5rem;font-size:1.02rem}
+ .fillwrap{position:relative;display:inline-block;white-space:nowrap}
+ .fillghost{color:#3f4a6e}
+ .filltext{position:absolute;left:0;top:0;width:0;overflow:hidden;
+      white-space:nowrap;color:#f2f0e9;
+      animation:fill linear forwards;animation-play-state:paused}
+ @keyframes fill{to{width:100%}}
  .listening{color:#7fe0a7;font-weight:bold}
  #againbtn{border:none;background:none;cursor:pointer;color:#ffd75e;
       font-size:.8rem;display:inline-flex;align-items:center;gap:.35rem;
@@ -425,11 +462,13 @@ fetch("voices/manifest.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).the
   voxchk.checked=localStorage.getItem("vox")!=="off";}
 }).catch(()=>{});
 voxchk.onchange=()=>localStorage.setItem("vox",voxchk.checked?"on":"off");
-let curClip=null;
-// Everything that silences the browser voice must also silence a playing
-// clip, or "paused" keeps talking in someone's real voice.
+// Several clips can play at once (together lines), so live audio is a
+// set. Everything that silences the browser voice must also silence
+// every playing clip, or "paused" keeps talking in someone's real voice.
+let liveClips=new Set();
 function hush(){speechSynthesis.cancel();
- if(curClip){curClip.onended=null;curClip.onerror=null;curClip.pause();curClip=null;}}
+ liveClips.forEach(a=>{a.onended=null;a.onerror=null;a.pause();});
+ liveClips.clear();}
 
 // ---- tiny synthesized sound effects (no files, nothing to license) ----
 let AC=null;
@@ -556,10 +595,10 @@ function speak(t,pace,who,done,lid){
  if(!t){done();return;}
  if(lid&&who&&voxchk.checked&&VOX.has(who+"/"+lid)){
   const a=new Audio("voices/"+who.replace(/ /g,"_")+"/"+lid+".mp3");
-  curClip=a;
+  liveClips.add(a);
   let fin=false;
-  const ok=()=>{if(!fin){fin=true;if(curClip===a)curClip=null;done();}};
-  const bad=()=>{if(!fin){fin=true;if(curClip===a)curClip=null;ttsSpeak(t,pace,who,done);}};
+  const ok=()=>{if(!fin){fin=true;liveClips.delete(a);done();}};
+  const bad=()=>{if(!fin){fin=true;liveClips.delete(a);ttsSpeak(t,pace,who,done);}};
   a.onended=ok;a.onerror=bad;
   a.play().catch(bad);
   return;
@@ -591,13 +630,24 @@ function show(l,auto){
  const words=norm(l.say).split(" ").filter(w=>w);
  const mine=auto?esc(l.say)
   :words.map(w=>'<span class="pending">'+esc(w)+'</span>').join(" ");
+ // Together lines: every partner's text loads in alongside the line,
+ // and the reveal sweeps all of them at the same calm pace once the
+ // moment starts (startSim sets the clocks running).
+ const simRows=(l.sim||[]).map(p=>{
+  const pav=DATA.avatars&&DATA.avatars[p.s]||"";
+  return '<div class="simline"><span style="font-size:1.2rem">'+(p.m||"\\u{1F642}")+
+   '</span> <span class="cuename">'+pav+" "+p.s+'.</span> '+
+   '<span class="fillwrap"><span class="fillghost">'+esc(p.t)+'</span>'+
+   '<span class="filltext">'+esc(p.t)+'</span></span></div>';}).join("");
  stage.innerHTML='<div class="cue"><span style="font-size:1.6rem">'+(c.mood||"\\u{1F642}")+'</span> '+
   (c.sfx?"\\u{1F514} ":"")+
   (c.speaker?'<span class="cuename">'+av+" "+c.speaker+'.</span> ':"")+esc(c.say)+
   '<button id="ctxbtn">Full Script</button></div>'+
   '<div id="ctx"></div>'+
   '<div id="verdict"></div>'+
-  '<div class="mine"><span class="cuename">'+myAv+" "+NAME+'.</span> <span id="diff">'+mine+'</span></div>'+
+  '<div class="mine"><span class="cuename">'+myAv+" "+NAME+'.</span> <span id="diff">'+mine+'</span>'+
+  (l.sim?'<span class="simchip">\\u{1F5E3} Speak with them</span>':"")+'</div>'+
+  simRows+
   (auto?"":'<div id="hints"><button id="wordbtn">Next Word</button> <button id="linebtn">Line</button> <button id="gotbtn">\\u2713 Got it</button></div>');
  const cb=document.getElementById("ctxbtn");
  // Full Script: the whole selected run, everyone's lines in order, with
@@ -609,7 +659,9 @@ function show(l,auto){
   queue.forEach((qi,k)=>{const L=DATA.lines[qi];
    (L.gap||[]).forEach(g=>{h+='<div class="fsline">'+
     (g.t?'<b>'+esc(g.s)+'.</b> '+esc(g.t):"\\u{1F514} (sound)")+"</div>";});
-   h+='<div class="fsline fsmine'+(k===pos?" fsnow":"")+'"><b>'+esc(NAME)+'.</b> '+esc(L.say)+'</div>';});
+   h+='<div class="fsline fsmine'+(k===pos?" fsnow":"")+'"><b>'+esc(NAME)+'.</b> '+esc(L.say)+'</div>';
+   (L.sim||[]).forEach(p=>{h+='<div class="fsline"><b>'+esc(p.s)+'.</b> '
+    +esc(p.t)+' <i>(together)</i></div>';});});
   x.innerHTML=h;x.style.display="block";
   document.getElementById("fsclose").onclick=()=>{x.style.display="none";};
   const now=x.querySelector(".fsnow");if(now)now.scrollIntoView({block:"center"});};
@@ -640,12 +692,23 @@ function setWhere(l){
   +" \\u00b7 line "+(pos+1)+" of "+queue.length;
 }
 let token=0;
+// The together moment: partners speak WHILE the actor does. Their clips
+// start, and every loaded text row reveals at the same pace, timed to
+// the longest partner line. Judging (where wanted) is already on.
+function startSim(l){
+ if(!l.sim||!l.sim.length)return;
+ const dur=Math.max(...l.sim.map(p=>1200+p.t.split(" ").length*430/1.3));
+ stage.querySelectorAll(".filltext").forEach(el=>{
+  el.style.animationDuration=dur+"ms";el.style.animationPlayState="running";});
+ l.sim.forEach(p=>speak(p.t,1.3,p.s,()=>{},p.l));
+}
 function myTurn(l,t,auto){
  if(t!==token||!running)return;
  show(l,auto);
  if(auto){speak(l.say,1.3,NAME,()=>{if(t===token&&running&&!paused)
-   setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},500);},l.l);}
- else{judging=true;
+   setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},500);},l.l);
+  startSim(l);}
+ else{judging=true;startSim(l);
   my.textContent=rec?"":"No mic here: say it out loud anyway, then \\u25B6";}
 }
 function showGap(g){
@@ -680,7 +743,7 @@ function step(){
   const wait=playSfx(l.cue.sfx);
   setTimeout(()=>{if(t!==token||!running||paused)return;
    speak(l.cue.say,l.cue.pace,l.cue.speaker,()=>{if(t!==token||!running||paused)return;
-    judging=true;
+    judging=true;startSim(l);
     my.textContent=rec?"":"No mic here: say it out loud anyway, then \\u25B6";},l.cue.l);},wait);
  }else{
   // Never perform more than the last stretch before their line: a
@@ -879,6 +942,9 @@ def main():
                 # Full Scene mode can perform it, voice by voice.
                 gap = []
                 for g in speeches[prev + 1:i]:
+                    # A together partner plays WITH the line, not before.
+                    if s.get("gid") and g.get("gid") == s["gid"]:
+                        continue
                     if g["speaker"] and g["say"]:
                         gap.append({"s": g["speaker"], "t": g["say"],
                                     "l": line_id(g["speaker"], g["say"]),
@@ -888,10 +954,18 @@ def main():
                     elif g["sfx"]:
                         gap.append({"s": "", "t": "", "m": NEUTRAL,
                                     "p": 1.3, "x": g["sfx"]})
-                lines.append({"i": i, "act": s["act"], "say": s["say"],
-                              "l": line_id(name, s["say"]),
-                              "page": s.get("page", 0),
-                              "cue": cue_for(speeches, i), "gap": gap})
+                rec = {"i": i, "act": s["act"], "say": s["say"],
+                       "l": line_id(name, s["say"]),
+                       "page": s.get("page", 0),
+                       "cue": cue_for(speeches, i), "gap": gap}
+                if s.get("gid"):
+                    rec["sim"] = [
+                        {"s": g["speaker"], "t": g["say"],
+                         "l": line_id(g["speaker"], g["say"]),
+                         "m": mood_of(g["text"])}
+                        for g in speeches
+                        if g.get("gid") == s["gid"] and g is not s]
+                lines.append(rec)
                 prev = i
         if not lines:
             continue
