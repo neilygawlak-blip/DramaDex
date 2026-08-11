@@ -33,8 +33,10 @@ INDEX = """<!DOCTYPE html>
 <h1>&#127821; See How They Run — pick your character</h1>
 <div class="muted">Open your page, pick a scene, press the pineapple.
 Speak your line when the cue finishes; it moves on when you land your
-last word. Arrow keys skip around. Full scene plays everyone else and
-waits for you; Listen through reads the lot.</div>
+last word. Blanking? Call for one word, or full line &mdash; the
+<b>Next Word</b> and <b>Line</b> buttons under your line, just like
+calling for line in rehearsal. Arrow keys skip around. Full scene plays
+everyone else and waits for you; Listen through reads the lot.</div>
 __LINKS__
 </body></html>
 """
