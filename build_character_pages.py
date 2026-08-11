@@ -563,7 +563,7 @@ function grade(expected,heard){
 const stage=document.getElementById("stage"),my=document.getElementById("mystate");
 const startbtn=document.getElementById("startbtn"),pausebtn=document.getElementById("pausebtn");
 const prevbtn=document.getElementById("prevbtn"),nextbtn=document.getElementById("nextbtn");
-let queue=[],pos=0,running=false,paused=false,judging=false,heard="",rec=null,revealed=false;
+let queue=[],pos=0,running=false,paused=false,judging=false,heard="",rec=null,revealed=false,simArmed=false;
 
 // ---- pick a system voice per character: gender, then accent preference ----
 const FEM=/female|zira|hazel|susan|heather|catherine|linda|samantha|karen|serena|kate|fiona|moira|tessa|libby|sonia|aria|jenny|michelle/i;
@@ -650,7 +650,7 @@ function show(l,auto){
   '<div id="ctx"></div>'+
   '<div id="verdict"></div>'+
   '<div class="mine"><span class="cuename">'+myAv+" "+NAME+'.</span> <span id="diff">'+mine+'</span>'+
-  (l.sim?'<span class="simchip">\\u{1F5E3} Speak with them</span>':"")+'</div>'+
+  (l.sim?'<span class="simchip">\\u{1F5E3} Speak along with them</span>':"")+'</div>'+
   simRows+
   (auto?"":'<div id="hints"><button id="wordbtn">Next Word</button> <button id="linebtn">Line</button> <button id="gotbtn">\\u2713 Got it</button></div>');
  const cb=document.getElementById("ctxbtn");
@@ -712,7 +712,10 @@ function myTurn(l,t,auto){
  if(auto){speak(l.say,1.3,NAME,()=>{if(t===token&&running&&!paused)
    setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},500);},l.l);
   startSim(l);}
- else{judging=true;startSim(l);
+ else{judging=true;
+  // With a mic, the partners wait for the actor's first word: the
+  // actor leads the together moment. No mic, nothing to wait for.
+  if(rec)simArmed=!!(l.sim&&l.sim.length);else startSim(l);
   my.textContent=rec?"":"No mic here: say it out loud anyway, then \\u25B6";}
 }
 function showGap(g){
@@ -740,14 +743,15 @@ function step(){
   stage.innerHTML='<div id="verdict">\\u{1F389}</div><div class="mine">'+what+'</div>';
   whereEl.textContent="";my.textContent="";stop();return;}
  const t=++token;
- const l=DATA.lines[queue[pos]];heard="";
+ const l=DATA.lines[queue[pos]];heard="";simArmed=false;
  setWhere(l);
  if(mode.value==="drill"){
   show(l,false);
   const wait=playSfx(l.cue.sfx);
   setTimeout(()=>{if(t!==token||!running||paused)return;
    speak(l.cue.say,l.cue.pace,l.cue.speaker,()=>{if(t!==token||!running||paused)return;
-    judging=true;startSim(l);
+    judging=true;
+    if(rec)simArmed=!!(l.sim&&l.sim.length);else startSim(l);
     my.textContent=rec?"":"No mic here: say it out loud anyway, then \\u25B6";},l.cue.l);},wait);
  }else{
   // Never perform more than the last stretch before their line: a
@@ -902,6 +906,7 @@ function initMic(){
  rec.onresult=e=>{
   if(!judging)return;
   heard="";for(let i=0;i<e.results.length;i++)heard+=e.results[i][0].transcript+" ";
+  if(simArmed&&heard.trim()){simArmed=false;startSim(DATA.lines[queue[pos]]);}
   lightUp(heard);
   const l=DATA.lines[queue[pos]];
   if(doneEnough(l)){try{rec.abort();}catch(_){/**/}judged(l,heard);setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);}
