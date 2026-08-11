@@ -458,8 +458,10 @@ const voxchk=document.getElementById("voxchk");
 fetch("voices/manifest.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(m=>{
  if(!m)return;
  for(const[c,ids]of Object.entries(m))ids.forEach(id=>VOX.add(c+"/"+id));
+ // Off unless the actor turned it on: drills stay echo-clean by
+ // default, real voices are the opt-in treat.
  if(VOX.size){document.getElementById("voxwrap").style.display="";
-  voxchk.checked=localStorage.getItem("vox")!=="off";}
+  voxchk.checked=localStorage.getItem("vox")==="on";}
 }).catch(()=>{});
 voxchk.onchange=()=>localStorage.setItem("vox",voxchk.checked?"on":"off");
 // Several clips can play at once (together lines), so live audio is a
