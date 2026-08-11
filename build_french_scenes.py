@@ -13,6 +13,13 @@ character with two easy lines in an act does not need to attend that
 call — the MAN can live in the Act III group). Assignments persist in the
 browser and export to a JSON file worth committing to the private repo.
 
+The Plan panel meets the director wherever he already is. He can type in
+a plan he made himself (a call is a label plus scene numbers, with actors
+derived automatically and adjustable by hand), and the checker bridges
+the logical gaps: scenes nobody is rehearsing, actors a call needs but
+does not name, actors named who have nothing to do in it. Fill gaps
+generates calls only for whatever the plan leaves uncovered.
+
 This never ships to the cast site: prep_deploy only copies handouts.
 
 Usage:
@@ -73,6 +80,7 @@ TEMPLATE = """<!DOCTYPE html>
  <label class="hint">trivial part &le; <input id="minlines" type="number" value="4" min="0" style="width:3.2rem"> lines</label>
  <button class="primary" id="groups">Suggest groups</button>
  <button id="export">Export JSON</button>
+ <label class="hint">import <input id="importfile" type="file" accept=".json" style="width:11rem"></label>
 </div>
 <div id="wrap">
  <div id="script"></div>
@@ -80,6 +88,17 @@ TEMPLATE = """<!DOCTYPE html>
   <div class="hint">Click a dashed suggestion to confirm it, or the blank
   gutter of any paragraph to start a scene there. Confirmed boundaries are
   gold. Everything saves in this browser; Export for the repo.</div>
+  <h2 style="font-size:.95rem;color:#ffd75e;margin:1rem 0 .3rem">The plan</h2>
+  <div class="hint">One call per line:<br>
+  <code>Tue &mdash; 3-7, 12 + IDA - CLIVE</code><br>
+  label, scene numbers/ranges, then optional
+  <code>+ NAME</code> to call someone extra and <code>- NAME</code> to
+  release someone. Actors are otherwise derived from the scenes.</div>
+  <textarea id="plan" rows="8" style="width:100%;background:#111a30;color:#e8e6df;
+   border:1px solid #2b3a5e;border-radius:8px;font-family:Consolas,monospace;
+   font-size:.82rem;margin:.3rem 0"></textarea>
+  <button class="primary" id="check">Check plan</button>
+  <button id="fill">Fill gaps</button>
   <div id="report"></div>
  </div>
 </div>
@@ -174,9 +193,91 @@ function analyse(){
  document.getElementById("report").textContent=out;
 }
 document.getElementById("groups").onclick=analyse;
+
+// ---- the director's plan: check it, bridge its gaps ----
+const planEl=document.getElementById("plan");
+planEl.value=localStorage.getItem(KEY+"_plan")||"";
+planEl.oninput=()=>localStorage.setItem(KEY+"_plan",planEl.value);
+function sceneData(){
+ const min=+document.getElementById("minlines").value||0;
+ const nums=sceneNumbers(),scenes={};
+ P.paras.forEach((p,i)=>{
+  const s=nums[i];if(!s)return;
+  scenes[s]=scenes[s]||{n:s,act:p.act,cast:{},firstPage:p.page,lines:0};
+  if(p.speaker){scenes[s].cast[p.speaker]=(scenes[s].cast[p.speaker]||0)+1;scenes[s].lines++;}
+ });
+ Object.values(scenes).forEach(s=>{
+  s.needed=Object.keys(s.cast).filter(c=>s.cast[c]>min).sort();});
+ return scenes;
+}
+function parseCall(line){
+ // label = text before the first digit; the rest holds scenes and +/- names
+ const di=line.search(/\\d/);if(di<0)return null;
+ const label=line.slice(0,di).replace(/[\\u2014:,-]+\\s*$/,"").trim()||"Call";
+ let rest=line.slice(di);
+ const extra=[],released=[];
+ rest=rest.replace(/([+-])\\s*([A-Z][A-Z ]*[A-Z]|[A-Z]+)/g,(_,sign,name)=>{
+  (sign==="+"?extra:released).push(name.trim());return "";});
+ const ids=new Set();
+ rest.split(/[ ,]+/).forEach(tok=>{
+  const r=tok.match(/^(\\d+)\\s*[-\\u2013]\\s*(\\d+)$/);
+  if(r){for(let k=+r[1];k<=+r[2];k++)ids.add(k);}
+  else if(/^\\d+$/.test(tok))ids.add(+tok);});
+ return {label,ids:[...ids].sort((a,b)=>a-b),extra,released};
+}
+function checkPlan(){
+ const scenes=sceneData();
+ const calls=planEl.value.split("\\n").map(l=>l.trim()).filter(Boolean).map(parseCall).filter(Boolean);
+ let out="PLAN CHECK\\n"+"=".repeat(46)+"\\n";
+ const covered=new Set();
+ calls.forEach(c=>{
+  const present=new Set(c.extra);
+  const needed=new Set();
+  c.ids.forEach(id=>{const s=scenes[id];if(!s)return;covered.add(id);
+   s.needed.forEach(n=>needed.add(n));Object.keys(s.cast).forEach(n=>{if(!c.released.includes(n))present.add(n);});});
+  c.released.forEach(n=>present.delete(n));
+  out+="\\n"+c.label+"  (scenes "+c.ids.join(",")+")\\n";
+  out+="  call: "+([...present].sort().join(", ")||"(nobody)")+"\\n";
+  const missing=[...needed].filter(n=>!present.has(n));
+  if(missing.length)out+="  \\u26A0 needed but released: "+missing.join(", ")+"\\n";
+  const idle=[...present].filter(n=>!c.ids.some(id=>scenes[id]&&scenes[id].cast[n]));
+  if(idle.length)out+="  \\u26A0 called but has no lines here: "+idle.join(", ")+"\\n";
+  const light=[...present].filter(n=>!idle.includes(n)&&!needed.has(n));
+  if(light.length)out+="  could release (trivial here): "+light.join(", ")+"\\n";
+ });
+ const all=Object.keys(scenes).map(Number);
+ const un=all.filter(id=>!covered.has(id));
+ out+="\\n"+"-".repeat(46)+"\\n";
+ out+=un.length?("\\u26A0 scenes in no call: "+un.join(", ")+"\\n"):"every scene is covered.\\n";
+ const bad=calls.flatMap(c=>c.ids.filter(id=>!scenes[id]));
+ if(bad.length)out+="\\u26A0 plan names scenes that do not exist: "+[...new Set(bad)].join(", ")+"\\n";
+ document.getElementById("report").textContent=out;
+ return un;
+}
+document.getElementById("check").onclick=checkPlan;
+document.getElementById("fill").onclick=()=>{
+ const un=checkPlan();if(!un.length)return;
+ const scenes=sceneData();
+ const groups={};
+ un.forEach(id=>{const sig=scenes[id].needed.join(" + ")||"(bits)";
+  groups[sig]=groups[sig]||[];groups[sig].push(id);});
+ let add="";
+ Object.entries(groups).forEach(([sig,ids])=>{
+  add+="\\nNew call ("+sig+") \\u2014 "+ids.join(", ");});
+ planEl.value=(planEl.value.trim()+add).trim();
+ planEl.oninput();checkPlan();
+};
+document.getElementById("importfile").onchange=e=>{
+ const f=e.target.files[0];if(!f)return;
+ f.text().then(t=>{const d=JSON.parse(t);
+  if(d.boundaries){bounds=new Set(d.boundaries);save();}
+  if(typeof d.plan==="string"){planEl.value=d.plan;planEl.oninput();}
+  render();});
+};
 document.getElementById("export").onclick=()=>{
  const nums=sceneNumbers();
  const data={boundaries:[...bounds].sort((a,b)=>a-b),
+  plan:planEl.value,
   scenes:P.paras.filter((p,i)=>bounds.has(i)).map((p,k)=>({scene:k+1,para:[...bounds].sort((a,b)=>a-b)[k],act:p.act,page:p.page}))};
  const blob=new Blob([JSON.stringify(data,null,1)],{type:"application/json"});
  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
