@@ -102,8 +102,8 @@ __LINKS__
   <line x1="12" y1="21" x2="12" y2="27" stroke="#ffd75e" stroke-width="2" stroke-linecap="round"/>
   <line x1="7.5" y1="28.5" x2="16.5" y2="28.5" stroke="#ffd75e" stroke-width="2" stroke-linecap="round"/>
  </svg></span>
- <span class="dlabel"><b>Voice Booth</b><span>Record your voice
- (1 min)</span>
+ <span class="dlabel"><b>Voice Booth</b><span>Record your voice for
+ others to use (~1 min)</span>
  <small>neil's lab &#8250;</small></span>
 </a>
 </aside>
@@ -151,7 +151,7 @@ BOOTH = """<!DOCTYPE html>
  #backbtn:hover{border-color:#ffd75e;color:#e8e6df}
 </style></head><body>
 <h1>&#127908; Voice Booth <span class="muted">— Neil's Lab</span></h1>
-<div class="muted">Record your voice (1 min) so others can use it.
+<div class="muted">Record your voice for others to use (~1 min).
 Three short takes. Use your <b>regular speaking voice</b> on the first
 two — the conversion copies your natural voice best, even if it
 flattens the theatrics. The third take is where the character comes
