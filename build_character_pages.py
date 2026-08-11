@@ -157,6 +157,9 @@ def spoken(text, speaker):
     if t.upper().startswith(speaker.upper()):
         t = t[len(speaker):]
     t = re.sub(r"\([^)]*\)", " ", t)
+    # "CLIVE and HUMPHREY (together)." lines: the second name is part of
+    # the heading, not something anyone says aloud.
+    t = re.sub(r"^\s*and\s+[A-Z][A-Z ]+?\s*[.:]", "", t)
     t = t.lstrip(" .:")
     return re.sub(r"\s+", " ", t).strip()
 
