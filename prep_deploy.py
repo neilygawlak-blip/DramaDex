@@ -29,14 +29,20 @@ INDEX = """<!DOCTYPE html>
    border-radius:10px;color:#e8e6df;text-decoration:none;background:#111a30}
  a:hover{border-color:#ffd75e;box-shadow:0 0 10px rgba(255,183,71,.35)}
  .muted{color:#7d87a3;font-size:.9rem}
+ .intro{margin:1rem 0 1.6rem}
+ .intro p{color:#9aa4c0;font-size:.92rem;margin:.55rem 0;line-height:1.55}
+ .intro b{color:#c9d2ea;font-weight:600}
 </style></head><body>
 <h1>&#127821; See How They Run — pick your character</h1>
-<div class="muted">Open your page, pick a scene, press the pineapple.
-Speak your line when the cue finishes; it moves on when you land your
-last word. Blanking? Call for one word, or full line &mdash; the
-<b>Next Word</b> and <b>Line</b> buttons under your line, just like
-calling for line in rehearsal. Arrow keys skip around. Full scene plays
-everyone else and waits for you; Listen through reads the lot.</div>
+<div class="intro">
+<p>Pick a scene, press the pineapple. Speak your line when the cue
+finishes; it moves on when you land your last word.</p>
+<p>Call for <b>one word</b>, or <b>full line</b>, just like calling for
+line in rehearsal. Arrow keys skip around.</p>
+<p>Practice with <b>just Cue Lines</b>, or <b>Full scene</b> plays
+everyone else and waits for you; or <b>Listen through</b> the whole
+thing in your car.</p>
+</div>
 __LINKS__
 </body></html>
 """
