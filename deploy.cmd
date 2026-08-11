@@ -8,5 +8,7 @@ python build_character_pages.py private/see_how_they_run_fixed.txt private/cast_
 python build_french_scenes.py private/see_how_they_run_fixed.txt private/cast_see_how_they_run.txt private/french_scenes.html || exit /b 1
 python prep_deploy.py private/handouts private/deploy || exit /b 1
 rem wrangler.toml names the project, the output folder and the Voice
-rem Booth's R2 bucket binding; plain deploy reads all of it from there.
-npx wrangler pages deploy
+rem Booth's KV binding; plain deploy reads all of it from there.
+rem Pinned: 4.121.0 shipped broken on npm (miniflare version not
+rem published, Aug 11 2026). Bump the pin when convenient.
+npx wrangler@4.120.1 pages deploy
