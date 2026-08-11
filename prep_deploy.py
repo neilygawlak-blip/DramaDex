@@ -32,6 +32,37 @@ INDEX = """<!DOCTYPE html>
  .intro{margin:1rem 0 1.6rem}
  .intro p{color:#9aa4c0;font-size:.92rem;margin:.55rem 0;line-height:1.55}
  .intro b{color:#c9d2ea;font-weight:600}
+ #cols{display:flex;gap:2rem;align-items:flex-start}
+ #cast{flex:1}
+ aside{flex:none;width:240px;position:sticky;top:2rem}
+ a.door-btn{display:flex;align-items:center;gap:.8rem;text-decoration:none;
+   padding:.8rem 1rem .8rem .8rem;border-radius:14px;cursor:pointer;
+   background:linear-gradient(160deg,#111a30,#0d1526);border:1px solid #2b3a5e;
+   box-shadow:0 8px 20px rgba(0,0,0,.55),0 0 10px rgba(255,183,71,.08);
+   transition:transform .18s ease,box-shadow .18s ease}
+ a.door-btn:hover{transform:translateY(-3px);border-color:#3a4a75;
+   box-shadow:0 14px 28px rgba(0,0,0,.65),0 0 22px rgba(255,183,71,.35)}
+ .doorway{width:44px;height:66px;flex:none;position:relative;perspective:180px;
+   border-radius:5px 5px 0 0;background:linear-gradient(180deg,#ffe9a8,#ffb347);
+   box-shadow:0 0 12px rgba(255,183,71,.45)}
+ .doorway .frame{position:absolute;inset:-3px -4px 0;border:2px solid #ffd75e;
+   border-bottom:none;border-radius:7px 7px 0 0;
+   filter:drop-shadow(0 0 4px rgba(255,215,94,.7))}
+ .doorway .panel{position:absolute;inset:0;transform-origin:left center;
+   transform:rotateY(-30deg);transition:transform .28s ease;
+   background:linear-gradient(100deg,#182446,#101a36 60%,#0c1428);
+   border-radius:3px 3px 0 0;border:1px solid #3a4a75;
+   box-shadow:5px 0 9px rgba(0,0,0,.5)}
+ .doorway .panel::after{content:"";position:absolute;right:5px;top:46%;
+   width:4px;height:4px;border-radius:50%;background:#ffd75e;
+   box-shadow:0 0 5px #ffb347}
+ a.door-btn:hover .panel{transform:rotateY(-56deg)}
+ .dlabel b{display:block;font-size:.92rem;color:#ffd75e;
+   text-shadow:0 0 8px rgba(255,183,71,.45)}
+ .dlabel span{display:block;font-size:.86rem;font-weight:600;color:#dfe6f7}
+ .dlabel small{display:block;margin-top:.2rem;color:#55618a;font-size:.66rem;
+   text-transform:uppercase;letter-spacing:.09em}
+ @media (max-width:720px){#cols{flex-direction:column}aside{width:100%;position:static;margin-top:1.2rem}}
 </style></head><body>
 <h1>&#127821; See How They Run — pick your character</h1>
 <div class="intro">
@@ -43,7 +74,18 @@ line in rehearsal. Arrow keys skip around.</p>
 everyone else and waits for you; or <b>Listen through</b> the whole
 thing in your car.</p>
 </div>
+<div id="cols">
+<div id="cast">
 __LINKS__
+</div>
+<aside>
+<a class="door-btn" href="french_scenes.html">
+ <span class="doorway"><span class="panel"></span><span class="frame"></span></span>
+ <span class="dlabel"><b>French Scene Labeler</b><span>Assign Groups</span>
+ <small>director's door &#8250;</small></span>
+</a>
+</aside>
+</div>
 </body></html>
 """
 
@@ -102,6 +144,10 @@ def main():
         links.append('<a href="%s">%s %s</a>' % (f, badge, nice))
     with open(os.path.join(dst, "index.html"), "w", encoding="utf-8") as fh:
         fh.write(INDEX.replace("__LINKS__", "\n".join(links)))
+    # The director's workbench ships behind the same gate as the cast.
+    fs = os.path.join(os.path.dirname(src), "french_scenes.html")
+    if os.path.exists(fs):
+        shutil.copy2(fs, os.path.join(dst, "french_scenes.html"))
     with open(os.path.join(dst, "_headers"), "w", encoding="utf-8") as fh:
         fh.write(HEADERS)
     with open(os.path.join(dst, "robots.txt"), "w", encoding="utf-8") as fh:
