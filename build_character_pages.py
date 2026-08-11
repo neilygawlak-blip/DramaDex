@@ -31,6 +31,7 @@ Usage:
         private/cast_see_how_they_run.txt private/handouts
 """
 
+import datetime
 import json
 import os
 import re
@@ -338,6 +339,12 @@ TEMPLATE = """<!DOCTYPE html>
       border-radius:999px;padding:.35rem .8rem;text-decoration:none;
       box-shadow:0 2px 8px rgba(0,0,0,.5)}
  #backbtn:hover{border-color:#ffd75e;color:#e8e6df}
+ #reportbtn{position:fixed;bottom:3.6rem;left:1.2rem;font-size:.72rem;
+      color:#55618a;background:#0d1526;border:1px solid #2b3a5e;
+      border-radius:999px;padding:.3rem .7rem;text-decoration:none;
+      box-shadow:0 2px 8px rgba(0,0,0,.5)}
+ #reportbtn:hover{border-color:#ffd75e;color:#e8e6df}
+ #build{margin-top:2.2rem;font-size:.68rem;color:#39415e;text-align:center}
 </style></head><body>
 <h1>__AVATAR__ __NAME__ <span class="muted">— See How They Run</span></h1>
 <div class="muted">__COUNT__ lines. Pick a scene, press the pineapple, and
@@ -358,6 +365,8 @@ just speak when it's your turn.</div>
 <div id="stage"></div>
 <div id="where"></div>
 <a id="backbtn" href="index.html">&#8592; Back to Character List</a>
+<a id="reportbtn" href="#">&#9888; Tell Neil it broke</a>
+<div id="build">build __BUILD__</div>
 <script>
 const DATA=__DATA__;
 const NAME="__NAME__";
@@ -659,9 +668,9 @@ function start(q){
  if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();
  if(AC.state==="suspended")AC.resume();
  try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u);}catch(_){/**/}
- initMic();step();
+ lockWake();initMic();step();
 }
-function stop(){running=false;startbtn.style.display="";pausebtn.style.display="none";
+function stop(){running=false;unlockWake();startbtn.style.display="";pausebtn.style.display="none";
  prevbtn.style.display="none";nextbtn.style.display="none";
  if(rec){rec.onend=null;rec.stop();rec=null;}}
 function jump(d){if(!running)return;speechSynthesis.cancel();judging=false;
@@ -681,7 +690,10 @@ document.addEventListener("keydown",e=>{
 let autoPaused=false;
 document.addEventListener("visibilitychange",()=>{
  if(document.hidden&&running&&!paused){pause();autoPaused=true;}
- else if(!document.hidden&&running&&paused&&autoPaused){autoPaused=false;resume();}});
+ else if(!document.hidden&&running){
+  // The OS drops the wake lock whenever the tab hides; take it back.
+  lockWake();
+  if(paused&&autoPaused){autoPaused=false;resume();}}});
 startbtn.onclick=()=>start(currentSet());
 // Changing the scene or mode mid-run: the queue was built at Start, so
 // the old run would keep playing ("stuck on whatever the line is").
@@ -707,6 +719,32 @@ function resume(){if(!paused)return;paused=false;autoPaused=false;
  if(rec)try{rec.start();}catch(_){/**/}
  step();}
 pausebtn.onclick=()=>{paused?resume():pause();};
+
+// ---- keep the screen awake while a run is on (hands-free means nobody
+// touches the phone, and a dimming screen would auto-pause the play) ----
+let wake=null;
+async function lockWake(){try{
+ if("wakeLock" in navigator&&!wake){wake=await navigator.wakeLock.request("screen");
+  wake.addEventListener("release",()=>{wake=null;});}}catch(_){/**/}}
+function unlockWake(){if(wake){wake.release().catch(()=>{});wake=null;}}
+
+// ---- error capture + one-tap bug report ----
+let lastErr="";
+window.addEventListener("error",e=>{lastErr=(e.message||"?")+" @"
+ +String(e.filename||"").split("/").pop()+":"+e.lineno;});
+window.addEventListener("unhandledrejection",e=>{lastErr=String(e.reason).slice(0,140);});
+document.getElementById("reportbtn").onclick=ev=>{ev.preventDefault();
+ const info="DramaDex "+NAME+" \\u00b7 build __BUILD__"
+  +"\\n"+location.href
+  +"\\n"+navigator.userAgent
+  +"\\nscope "+scope.value+" \\u00b7 mode "+mode.value
+  +(running?" \\u00b7 line "+(pos+1)+" of "+queue.length:"")
+  +"\\nlast error: "+(lastErr||"none caught");
+ try{navigator.clipboard.writeText(info);}catch(_){/**/}
+ my.textContent="Report copied \\u2014 opening email\\u2026";
+ location.href="mailto:Chris@nexustechfl.com?subject="
+  +encodeURIComponent("DramaDex bug \\u2014 "+NAME)
+  +"&body="+encodeURIComponent(info+"\\n\\nWhat happened / what needs fixing:\\n");};
 
 function initMic(){
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -769,10 +807,12 @@ def main():
         runs = runs_for(speeches, name)
         data = {"lines": lines, "runs": runs, "voices": VOICE_PROFILES,
                 "avatars": AVATARS}
+        build = datetime.datetime.now().strftime("%b %d, %I:%M %p")
         html = (TEMPLATE
                 .replace("__AVATAR__", AVATARS.get(name, ""))
                 .replace("__NAME__", name)
                 .replace("__COUNT__", str(len(lines)))
+                .replace("__BUILD__", build)
                 .replace("__DATA__", json.dumps(data, ensure_ascii=False)))
         path = os.path.join(outdir, name.replace(" ", "_") + ".html")
         with open(path, "w", encoding="utf-8") as fh:
