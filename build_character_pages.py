@@ -126,8 +126,10 @@ AVATARS = {
     "PENELOPE":     "\U0001F3AD\U0001F456",   # actress in the scandalous slacks
     "LIONEL":       "✝\U0001FA73",       # the vicar, reduced to his shorts
     # Military medal, not the helmet: U+1FA96 is a 2020 emoji Windows 10
-    # never received, and Clive rendered as a tofu square on it.
-    "CLIVE":        "\U0001F396️✝",  # decorated airman, borrowed dog collar
+    # never received, and Clive rendered as a tofu square on it. The
+    # masks over the dog collar: his badge tells who he IS (soldier,
+    # actor), not the vicar he spends the play disguised as.
+    "CLIVE":        "\U0001F396️\U0001F3AD",  # the soldier-actor
     "BISHOP":       "✝\U0001F458",       # bishop in pyjamas and robe
     "HUMPHREY":     "✝\U0001F9E3",       # the mild one with the muffler
     # Hammer and sickle renders everywhere, including desktop Windows
