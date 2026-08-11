@@ -353,10 +353,10 @@ TEMPLATE = """<!DOCTYPE html>
  #verdict{font-size:2.2rem;margin:.5rem 0;min-height:2.6rem}
  #verdict svg{width:2.6rem;height:2.6rem;vertical-align:middle}
  #verdict .ccirc{stroke:#7fe0a7;stroke-width:2.5;fill:none;opacity:.45;
-      stroke-dasharray:151;stroke-dashoffset:151;animation:cdraw .45s ease-out forwards}
+      stroke-dasharray:151;stroke-dashoffset:151;animation:cdraw .25s ease-out forwards}
  #verdict .cmark{stroke:#7fe0a7;stroke-width:4;stroke-linecap:round;
       stroke-linejoin:round;fill:none;stroke-dasharray:36;stroke-dashoffset:36;
-      animation:cdraw .35s .22s ease-out forwards;
+      animation:cdraw .2s .12s ease-out forwards;
       filter:drop-shadow(0 0 6px rgba(127,224,167,.7))}
  @keyframes cdraw{to{stroke-dashoffset:0}}
  #diff span.ok{color:#7fe0a7}
