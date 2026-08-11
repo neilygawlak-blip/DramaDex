@@ -778,15 +778,19 @@ function lev(a,b){if(a===b)return 0;let p=[...Array(b.length+1).keys()];
   for(let j=1;j<=b.length;j++)c.push(Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]!==b[j-1])));
   p=c;}return p[b.length];}
 function doneEnough(l){
- // Advance only when the word JUST spoken is the line's final word
- // (off-by-a-letter allowed on longer words). Matching anywhere in the
- // transcript let a mid-line stall advance the run the moment an
- // earlier word resembled the ending. Nothing else auto-advances;
- // Got it and the arrow are the way onward when recognition loses it.
  const E=norm(l.say).split(" ").filter(w=>w);
  if(!E.length)return true;
- const H=norm(heard).split(" ").filter(w=>w);
+ const H=norm(heard).split(" ").filter(w=>!FILLERS.has(w));
  if(!H.length)return false;
+ const S=soundSets(H);
+ const hit=E.filter(w=>wordOk(w,S)).length;
+ // Every word landed: the display shows all green, so the gate opens.
+ // No last-word ceremony when there is nothing left to say.
+ if(hit===E.length)return true;
+ // Below 100%: advance only when the word JUST spoken is the line's
+ // final word (off-by-a-letter allowed on longer words). Matching
+ // anywhere in the transcript let a mid-line stall advance the run the
+ // moment an earlier word resembled the ending.
  const last=canon(E[E.length-1]);
  const tol=last.length>=5?1:0;
  const endsRight=H.slice(-2).map(canon).some(h=>h===last||(tol&&lev(h,last)<=tol)
@@ -796,8 +800,6 @@ function doneEnough(l){
  // what is it?" says "it" at word four. The ending only counts once
  // most of the line is behind them. Three words or fewer are exempt.
  if(E.length<=3)return true;
- const S=soundSets(H);
- const hit=E.filter(w=>wordOk(w,S)).length;
  return hit/E.length>=.55;
 }
 
