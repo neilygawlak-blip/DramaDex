@@ -467,7 +467,10 @@ function pkey(w){
  if(!w)return"";
  w=w.replace(/^kn|^gn/,"n").replace(/^wr/,"r").replace(/^ps/,"s").replace(/^wh/,"w");
  w=w.replace(/mb$/,"m").replace(/tion|sion/g,"xn");
- w=w.replace(/sch/g,"sk").replace(/ch|sh/g,"x").replace(/th/g,"t");
+ // th keeps its own symbol: folding it into t merged there/tree and
+ // three/free, and random room words lit script words green. this/these
+ // and wish/which still fold together, which is all the layer is for.
+ w=w.replace(/sch/g,"sk").replace(/ch|sh/g,"x").replace(/th/g,"8");
  w=w.replace(/ph/g,"f").replace(/gh$/,"f").replace(/gh/g,"");
  w=w.replace(/ck/g,"k").replace(/c(?=[iey])/g,"s").replace(/c/g,"k").replace(/q/g,"k").replace(/x/g,"ks");
  w=w.replace(/dg/g,"j").replace(/g(?=[iey])/g,"j");
@@ -546,15 +549,14 @@ function pickVoice(p,who){
 const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)
  ||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
 // A line with a rendered clip plays the actor's own voice; anything else
-// (and any clip that fails to load) goes to the browser voice. The farce
-// pace only nudges a recorded human, never drives it, and preservesPitch
-// keeps the voice theirs at any speed.
+// (and any clip that fails to load) goes to the browser voice. A real
+// voice plays exactly as rendered: the farce-pace speed-uppers belong to
+// the robot voices, not to a human.
 function speak(t,pace,who,done,lid){
  if(!t){done();return;}
  if(lid&&who&&voxchk.checked&&VOX.has(who+"/"+lid)){
   const a=new Audio("voices/"+who.replace(/ /g,"_")+"/"+lid+".mp3");
-  curClip=a;a.preservesPitch=true;
-  a.playbackRate=1+((pace||1.3)-1)*.45;
+  curClip=a;
   let fin=false;
   const ok=()=>{if(!fin){fin=true;if(curClip===a)curClip=null;done();}};
   const bad=()=>{if(!fin){fin=true;if(curClip===a)curClip=null;ttsSpeak(t,pace,who,done);}};
@@ -829,9 +831,17 @@ function initMic(){
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR||location.protocol==="file:"){rec=null;return;}
  rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang="en-US";
+ // The mic runs through the cue playback too, and it hears the phone's
+ // own speaker: with real cast voices the recognizer transcribes the cue
+ // almost perfectly, and those words then lit up green in the actor's
+ // line before they said a thing. While not judging, keep sliding the
+ // baseline past everything heard; a line is judged only on what arrives
+ // after its own window opens.
+ let skipResults=0;
+ rec.onstart=()=>{skipResults=0;};
  rec.onresult=e=>{
-  if(!judging)return;
-  heard="";for(let i=0;i<e.results.length;i++)heard+=e.results[i][0].transcript+" ";
+  if(!judging){skipResults=e.results.length;return;}
+  heard="";for(let i=skipResults;i<e.results.length;i++)heard+=e.results[i][0].transcript+" ";
   lightUp(heard);
   const l=DATA.lines[queue[pos]];
   if(doneEnough(l)){try{rec.abort();}catch(_){/**/}judged(l,heard);setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);}
