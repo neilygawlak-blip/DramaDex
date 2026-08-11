@@ -961,8 +961,8 @@ READ_TEMPLATE = """<!DOCTYPE html>
  body{font-family:"Segoe UI Variable Display","Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
       font-weight:500;letter-spacing:.012em;max-width:640px;margin:0 auto;
       padding:0 1rem 5rem;background:#0a0f1e;color:#e8e6df;line-height:1.55}
- #top{position:sticky;top:0;background:#0a0f1e;padding:1rem 0 .6rem;z-index:5;
-      border-bottom:1px solid #1a2440}
+ #top{position:-webkit-sticky;position:sticky;top:0;background:#0a0f1e;
+      padding:1rem 0 .6rem;z-index:5;border-bottom:1px solid #1a2440}
  h1{font-size:1.3rem;font-weight:800;letter-spacing:.03em;margin:0 0 .2rem;color:#ffd75e}
  .muted{color:#7d87a3;font-size:.85rem;font-weight:400}
  select,button{font-size:1rem;padding:.45rem .8rem;margin:.4rem .3rem 0 0;
@@ -1141,32 +1141,43 @@ function step(){
   speak(it.t,it.p,it.s,()=>{if(t===token&&running&&!paused){idx++;
    setTimeout(step,120);}},it.l);},w);
 }
+// The top-bar button is the read-through's transport: Play, then Pause,
+// then Resume, always visible in the sticky bar. The floating corner
+// button mirrors it for thumb reach, but pausing never requires aiming
+// at a button that floats over tappable script rows.
+function syncButtons(){
+ startbtn.innerHTML=!running?"\\u{1F34D} Play"
+  :(paused?"\\u25B6 Resume":"\\u23F8 Pause");
+ pausebtn.style.display=running?"inline-block":"none";
+ pausebtn.textContent=paused?"\\u25B6":"\\u23F8";
+}
 function start(from){
  const [a,b]=rangeFor();
  idx=from!=null?from:a;endAt=b;
  if(idx<a||idx>=b){idx=a;}
- running=true;paused=false;
- startbtn.style.display="none";pausebtn.style.display="";
- pausebtn.textContent="\\u23F8";
+ running=true;paused=false;syncButtons();
  if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();
  if(AC.state==="suspended")AC.resume();
  try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u);}catch(_){/**/}
  lockWake();step();
 }
 function stop(){running=false;paused=false;unlockWake();hush();token++;
- startbtn.style.display="";pausebtn.style.display="none";}
-startbtn.onclick=()=>start(pickedFrom);
+ syncButtons();}
+function togglePause(){
+ if(!running)return;
+ if(paused){paused=false;step();}
+ else{paused=true;token++;hush();}
+ syncButtons();
+}
+startbtn.onclick=()=>{running?togglePause():start(pickedFrom);};
 scriptEl.addEventListener("click",e=>{
  const r=e.target.closest(".row");if(!r)return;
  const i=+r.dataset.i;
- if(running){token++;hush();idx=i;setTimeout(step,120);}
+ if(running){token++;hush();idx=i;paused=false;syncButtons();setTimeout(step,120);}
  else{pickedFrom=i;mark(i);}
 });
 scope.onchange=()=>{if(running)stop();pickedFrom=null;};
-pausebtn.onclick=()=>{
- if(paused){paused=false;pausebtn.textContent="\\u23F8";step();}
- else{paused=true;token++;hush();pausebtn.textContent="\\u25B6";}
-};
+pausebtn.onclick=togglePause;
 let autoPaused=false;
 document.addEventListener("visibilitychange",()=>{
  if(document.hidden&&running&&!paused){pausebtn.onclick();autoPaused=true;}
