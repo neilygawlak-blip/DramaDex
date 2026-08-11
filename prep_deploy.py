@@ -345,6 +345,8 @@ def main():
         nice = key.title()
         badge = AVATARS.get(key, "")
         links.append('<a href="%s">%s %s</a>' % (f, badge, nice))
+    # The read-through leads the list; the actual cast stays alphabetical.
+    links.sort(key=lambda l: "FULL_READ_THROUGH" not in l)
     with open(os.path.join(dst, "index.html"), "w", encoding="utf-8") as fh:
         fh.write(INDEX.replace("__LINKS__", "\n".join(links)))
     # The director's workbench ships behind the same gate as the cast.
