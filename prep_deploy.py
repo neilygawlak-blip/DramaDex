@@ -169,17 +169,18 @@ nothing else, nowhere else — and it's deleted if you ask.</div>
 <a id="backbtn" href="index.html">&#8592; Back to Cast List</a>
 <script>
 const CAST=__CAST__;
+// The cloner only keeps ~12 seconds of reference, so card 1 is sized to
+// fit that at an easy pace, and every card stops the recording itself at
+// its cap: nobody should feel a clock and rush.
 const CARDS=[
- {title:"1 · The paragraph (your everyday voice)",min:9,free:false,
-  text:"Right, here goes. This is my ordinary speaking voice, recorded "+
-   "for Neil's Lab. The old church clock struck nine while thick fog "+
-   "rolled over the village green, and somebody's bicycle bell jangled "+
-   "twice outside the vicarage gate. I judge a good cup of tea by three "+
-   "things: the pot, the pour, and the patience."},
- {title:"2 · A question, then an order (mean both)",min:4,free:false,
+ {title:"1 · The paragraph (your everyday voice)",min:6,max:16,free:false,
+  text:"Right, here goes: my ordinary speaking voice. The old church "+
+   "clock struck nine, thick fog rolled over the green, and somebody's "+
+   "bicycle bell jangled twice."},
+ {title:"2 · A question, then an order (mean both)",min:3,max:10,free:false,
   text:"Who on earth put a penguin in the pantry? Well, don't just "+
    "stand there -- go and fetch it out!"},
- {title:"3 · A line of your own",min:2,free:true,
+ {title:"3 · A line of your own",min:2,max:15,free:true,
   text:"One line of your character, from memory -- your favorite "+
    "delivery, played the way you'd play it on stage."},
 ];
@@ -187,7 +188,7 @@ const whoSel=document.getElementById("who");
 CAST.forEach(c=>{const o=document.createElement("option");o.value=c;o.textContent=c;whoSel.appendChild(o);});
 
 const takes=CARDS.map(()=>null);   // {blob,type,dur,peak,clip}
-let stream=null,ac=null,an=null,mr=null,chunks=[],recIdx=-1,t0=0,peak=0,clipN=0,frameN=0,raf=0;
+let stream=null,ac=null,an=null,mr=null,chunks=[],recIdx=-1,t0=0,peak=0,clipN=0,frameN=0,raf=0,maxT=0;
 const MT=["audio/webm;codecs=opus","audio/webm","audio/mp4"].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t))||"";
 const meter=document.getElementById("meter"),bar=meter.firstElementChild;
 
@@ -235,9 +236,11 @@ async function startRec(i,btn){
  mr.start();
  btn.textContent="\\u23F9 Stop";btn.classList.add("on");
  meter.style.display="block";watch();
- state(i,"Recording\\u2026 take your time.");
+ state(i,"Recording\\u2026 easy pace; it stops itself at "+CARDS[i].max+"s.");
+ maxT=setTimeout(()=>{if(mr&&mr.state==="recording"&&recIdx===i)mr.stop();},CARDS[i].max*1000);
 }
 function finishRec(i,btn){
+ clearTimeout(maxT);
  cancelAnimationFrame(raf);meter.style.display="none";
  btn.textContent="\\u23FA Record";btn.classList.remove("on");
  const dur=(Date.now()-t0)/1000;

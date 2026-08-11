@@ -24,11 +24,16 @@ One-time setup (done once on this machine, ~6 GB):
 Usage (run with the venv python):
     .venv-voice\\Scripts\\python make_voice.py MAN sample1.webm [sample2 ...]
         [--ref-text "exact words spoken in the chosen sample"]
+        [--speed 0.9] render slower (<1) or faster (>1); default 1.0
         [--dry-run]   list the lines and bench verdicts, render nothing
         [--force]     re-render clips that already exist
 
-If the sample is the booth's card 1, the default --ref-text already
-matches it word for word.
+By default the reference transcript is NOT supplied: F5 clips any
+reference to ~12 s, and a transcript of the whole take makes it believe
+the voice speaks faster than it does — every clip came out rushed and
+slurry. With no --ref-text it Whisper-transcribes exactly the audio it
+kept, so the words and the sound always agree. Pass --ref-text only if
+the auto transcript is visibly wrong in the log.
 """
 
 import argparse
@@ -46,13 +51,6 @@ from build_character_pages import line_id, parse
 FIXED = os.path.join("private", "see_how_they_run_fixed.txt")
 CASTF = os.path.join("private", "cast_see_how_they_run.txt")
 VOICES = os.path.join("private", "voices")
-
-# The booth's card 1, word for word. A card-1 take needs no --ref-text.
-CARD1 = ("Right, here goes. This is my ordinary speaking voice, recorded "
-         "for Neil's Lab. The old church clock struck nine while thick fog "
-         "rolled over the village green, and somebody's bicycle bell "
-         "jangled twice outside the vicarage gate. I judge a good cup of "
-         "tea by three things: the pot, the pour, and the patience.")
 
 # Bench thresholds. Below MIN_SECS after trimming there is not enough
 # voice to clone from; a peak under MIN_PEAK means the mic barely heard
@@ -146,8 +144,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("who", help="character name, e.g. MAN")
     ap.add_argument("samples", nargs="+", help="Voice Booth recordings")
-    ap.add_argument("--ref-text", default=CARD1,
-                    help="exact words spoken in the sample (default: card 1)")
+    ap.add_argument("--ref-text", default="",
+                    help="exact words spoken in the sample "
+                         "(default: Whisper-transcribe the kept audio)")
+    ap.add_argument("--speed", type=float, default=1.0,
+                    help="rendered speaking speed, 1.0 = as the reference")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
@@ -225,7 +226,7 @@ def main():
     for n, (lid, say, dest) in enumerate(todo, 1):
         tts.infer(ref_file=ref, ref_text=args.ref_text,
                   gen_text=speakable(say), file_wave=tmp_wav,
-                  remove_silence=True)
+                  speed=args.speed, remove_silence=True)
         mp3_out(ff, tmp_wav, dest)
         print("  %4d/%d  %s  %.48s" % (n, len(todo), lid, say))
 
