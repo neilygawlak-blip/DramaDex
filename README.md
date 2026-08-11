@@ -47,3 +47,13 @@ Workbench features working now:
 ## Working style for agents
 
 Chris's standing rule: no yes-manning. Objective assessment in both directions, flag risks proactively, no unearned enthusiasm. Lead with the answer. Plain language. He builds by shipping one genuinely useful basic thing and stacking on it.
+
+## Two-agent coordination (standing rule, set by Chris Aug 2026)
+
+Two agents work this project from different machines (home PC and Dexter), sharing both repos. To stop parallel-work collisions:
+
+1. **Pull before starting any task** — both repos (`DramaDex` and `private/`).
+2. **Push promptly when a task lands** — don't sit on finished commits.
+3. **One mission, one machine** — don't run the same task (a read-through, a feature) on both machines at once. If Chris assigns overlapping work, say so.
+4. **On conflict in generated files** (handouts, french_scenes.html, fixed text): never hand-merge them. Take the newest *source* text, rerun the pipeline (apply_fixes_v2 → build_character_pages → build_french_scenes → prep_deploy), commit the regenerated output.
+5. **Photos beat context.** The home machine has the page photos; a photo-verified reading wins over any inference made without them.
