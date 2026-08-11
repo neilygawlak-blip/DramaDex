@@ -783,9 +783,10 @@ function judged(l,text){
  lightUp(text);
  my.textContent="";
  const t=token;
- // A beat to read the verdict, then straight on. The left arrow is the
- // way back when a line deserves another pass.
- setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},1000);
+ // Farce pacing wins over feedback-reading (Chris's call): just enough
+ // of a beat for the check to draw, then straight on. The left arrow is
+ // the way back when a line deserves another pass.
+ setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},400);
 }
 
 function lev(a,b){if(a===b)return 0;let p=[...Array(b.length+1).keys()];
