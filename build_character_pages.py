@@ -757,8 +757,11 @@ function step(){
   const v=scope.value;
   const what=v.startsWith("act:")?v.slice(4)+" complete!"
    :v.startsWith("run:")?"Scene complete!":"That's the whole play!";
-  stage.innerHTML='<div id="verdict">\\u{1F389}</div><div class="mine">'+what+'</div>';
-  whereEl.textContent="";my.textContent="";stop();return;}
+  stage.innerHTML='<div id="verdict">\\u{1F389}</div><div class="mine">'+what+'</div>'+
+   '<button class="primary" id="runbackbtn" style="margin-top:.9rem">\\u21BA Run It Back</button>';
+  whereEl.textContent="";my.textContent="";stop();
+  document.getElementById("runbackbtn").onclick=()=>start(currentSet());
+  return;}
  const t=++token;
  const l=DATA.lines[queue[pos]];heard="";simArmed=false;
  setWhere(l);
