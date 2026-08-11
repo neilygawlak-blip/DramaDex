@@ -1026,7 +1026,10 @@ voxchk.onchange=()=>localStorage.setItem("vox",voxchk.checked?"on":"off");
 const spdSel=document.getElementById("spd");
 let SPD=+(localStorage.getItem("rtspd")||1)||1;
 if([...spdSel.options].some(o=>+o.value===SPD))spdSel.value=String(SPD);else SPD=1;
-spdSel.onchange=()=>{SPD=+spdSel.value;localStorage.setItem("rtspd",spdSel.value);};
+spdSel.onchange=()=>{SPD=+spdSel.value;localStorage.setItem("rtspd",spdSel.value);
+ // A robot voice can't change gears mid-sentence (next line catches
+ // up), but a playing clip can: retune it right now.
+ liveClips.forEach(a=>{a.playbackRate=SPD;});};
 let liveClips=new Set();
 function hush(){speechSynthesis.cancel();
  liveClips.forEach(a=>{a.onended=null;a.onerror=null;a.pause();});
@@ -1077,8 +1080,12 @@ const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)
 function ttsSpeak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynthesisUtterance(t);
  const p=(DATA.voices&&DATA.voices[who])||{g:"m",style:"casual",mult:1};
  const v=pickVoice(p,who);if(v)u.voice=v;
- let r=(pace||1.3)*(p.mult||1)*SPD;
+ let r=(pace||1.3)*(p.mult||1);
  if(IOS)r=1+(r-1)*.3;
+ // The listener's speed multiplies AFTER the iOS squeeze: the squeeze
+ // corrects the platform's fast reading, but a chosen Half or Fastest
+ // must actually mean it on every device.
+ r*=SPD;
  u.rate=r;
  u.pitch=(v&&rank(v)===0)?1:(p.g==="f"?1.1:.85);
  let fin=false;const fin1=()=>{if(!fin){fin=true;clearTimeout(guard);done();}};
