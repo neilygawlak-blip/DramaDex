@@ -76,7 +76,7 @@ INDEX = """<!DOCTYPE html>
 <div class="intro">
 <p style="color:#ffd75e">I built this for repetition and line-learning.
 Always ask your cast mates to run lines first if you can. It's always
-funner with friends.</p>
+more fun with friends.</p>
 <p>Pick a scene, press the pineapple. Speak your line when the cue
 finishes; it moves on when you land your last word.</p>
 <p>Call for <b>one word</b>, or <b>full line</b>, just like calling for
