@@ -1111,6 +1111,10 @@ function buildScope(){
  [...new Set(DATA.items.map(it=>it.act).filter(Boolean))].forEach(a=>add("act:"+a,a));
 }
 buildScope();
+// The cast page links straight to an act: ?act=2 preselects Act II.
+const actQ=new URLSearchParams(location.search).get("act");
+if(actQ){const want="act:Act "+["","I","II","III"][+actQ];
+ if([...scope.options].some(o=>o.value===want))scope.value=want;}
 function rangeFor(){
  const v=scope.value;
  if(v.startsWith("act:")){

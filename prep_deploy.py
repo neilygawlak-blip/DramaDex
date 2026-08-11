@@ -64,6 +64,10 @@ INDEX = """<!DOCTYPE html>
  .dlabel span{display:block;font-size:.86rem;font-weight:600;color:#dfe6f7}
  .dlabel small{display:block;margin-top:.2rem;color:#55618a;font-size:.66rem;
    text-transform:uppercase;letter-spacing:.09em}
+ .subacts{display:flex;gap:.5rem;margin:.4rem 0 0}
+ .subacts a{flex:1;text-align:center;padding:.45rem .4rem;margin:0;
+   font-size:.88rem;color:#9aa4c0}
+ hr.castbreak{border:none;border-top:1px solid #2b3a5e;margin:1.1rem 0}
  .micbox{width:44px;height:66px;flex:none;display:flex;align-items:center;
    justify-content:center;border-radius:10px;
    background:linear-gradient(180deg,#182446,#0c1428);border:1px solid #3a4a75;
@@ -345,8 +349,15 @@ def main():
         nice = key.title()
         badge = AVATARS.get(key, "")
         links.append('<a href="%s">%s %s</a>' % (f, badge, nice))
-    # The read-through leads the list; the actual cast stays alphabetical.
+    # The read-through leads the list with its act shortcuts, then a
+    # rule, then the actual cast alphabetically.
     links.sort(key=lambda l: "FULL_READ_THROUGH" not in l)
+    links.insert(1, (
+        '<div class="subacts">'
+        '<a href="FULL_READ_THROUGH.html?act=1">Act I</a>'
+        '<a href="FULL_READ_THROUGH.html?act=2">Act II</a>'
+        '<a href="FULL_READ_THROUGH.html?act=3">Act III</a>'
+        '</div>\n<hr class="castbreak">'))
     with open(os.path.join(dst, "index.html"), "w", encoding="utf-8") as fh:
         fh.write(INDEX.replace("__LINKS__", "\n".join(links)))
     # The director's workbench ships behind the same gate as the cast.
