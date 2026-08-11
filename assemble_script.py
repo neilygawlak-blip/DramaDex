@@ -101,7 +101,7 @@ def detect_speech(line, cast):
         m = SPEAKER_RE.match(line)
         if m:
             raw = m.group(1).strip(" .:")
-            return raw, raw
+            return raw, raw, 0
         return None
 
     head = line[:46]
@@ -117,7 +117,7 @@ def detect_speech(line, cast):
             continue
         cand, dist, near = nearest_cast(core, cast)
         if near and (best is None or len(core) > len(best[1])):
-            best = (cand, core)
+            best = (cand, core, dist)
     return best
 
 
@@ -228,8 +228,11 @@ def assemble(lines, cast=None):
         if buf.strip():
             text = fix_ocr_confusions(re.sub(r"\s+", " ", buf).strip())
             if buf_speech:
-                canon, raw = buf_speech
-                if text.startswith(raw) and canon.upper() != raw.upper():
+                canon, raw = buf_speech[0], buf_speech[1]
+                # Case counts as a correction: small caps come back as
+                # "MISs SKILLON" often, and the parser downstream wants
+                # one spelling of each name, not five.
+                if text.startswith(raw) and canon != raw:
                     text = canon + text[len(raw):]
                     snapped.append((raw, canon))
                 speakers[canon] += 1
@@ -242,6 +245,19 @@ def assemble(lines, cast=None):
         if not t:
             continue
         sp = detect_speech(t, cast)
+        if sp and sp[2] > 0:
+            # An ordinary word at a line head can sit one letter from a
+            # cast name: "a good / idea. He pulls" is not IDA speaking.
+            # A real name misread keeps the shape of its capitals, and a
+            # real new speech does not arrive while the speech before it
+            # hangs mid-sentence. Corrected, mostly-lowercase, mid-
+            # sentence: all three together mean it is just a word.
+            core = sp[1]
+            lowerish = (sum(c.islower() for c in core)
+                        > sum(c.isupper() for c in core))
+            if (lowerish and buf
+                    and not buf.rstrip().endswith(ENDS_COMPLETE)):
+                sp = None
         if sp:
             new_para = True
             starts_by_speaker += 1

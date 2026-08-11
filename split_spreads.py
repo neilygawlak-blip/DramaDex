@@ -21,6 +21,10 @@ still corrected and the pages are renumbered, so the rest of the pipeline is
 the same either way.
 --start renumbers the output when a batch continues an earlier one.
 --turn / --no-turn override the orientation decision.
+--cw turns clockwise instead of anticlockwise. The type test can only say
+that a page is lying sideways, not which of the two ways, and it guesses
+anticlockwise. If OCR comes back as mirrored gibberish, the batch was lying
+the other way: rerun with --cw.
 """
 
 import os
@@ -107,20 +111,20 @@ def find_gutter(img):
     return (x if found else w // 2), found
 
 
-def place_single(path, outdir, index, turn):
+def place_single(path, outdir, index, turn, cw=False):
     """One photo, one page. Orientation is still fixed, nothing is cut."""
     img = Image.open(path)
     if turn:
-        img = img.rotate(90, expand=True)
+        img = img.rotate(-90 if cw else 90, expand=True)
     out = os.path.join(outdir, "page_%03d.jpg" % index)
     img.convert("RGB").save(out, quality=92)
     return img.size
 
 
-def split_image(path, outdir, index, turn):
+def split_image(path, outdir, index, turn, cw=False):
     img = Image.open(path)
     if turn:
-        img = img.rotate(90, expand=True)
+        img = img.rotate(-90 if cw else 90, expand=True)
     w, h = img.size
     x, found = find_gutter(img)
     trim = int(w * GUTTER_TRIM)
@@ -140,9 +144,13 @@ def main():
     start = 1
     force_turn = None
     single = False
+    cw = False
     if "--single" in argv:
         single = True
         argv.remove("--single")
+    if "--cw" in argv:
+        cw = True
+        argv.remove("--cw")
     if "--turn" in argv:
         force_turn = True
         argv.remove("--turn")
@@ -182,7 +190,7 @@ def main():
     guessed = []
     if single:
         for f in shots:
-            w, h = place_single(os.path.join(src, f), dst, index, turn)
+            w, h = place_single(os.path.join(src, f), dst, index, turn, cw)
             print("%-22s -> page_%03d   %dx%d" % (f, index, w, h))
             index += 1
         print("\n%d photos -> %d pages in %s" % (len(shots), index - start, dst))
@@ -190,7 +198,7 @@ def main():
 
     for f in shots:
         path = os.path.join(src, f)
-        found, x, w = split_image(path, dst, index, turn)
+        found, x, w = split_image(path, dst, index, turn, cw)
         if not found:
             guessed.append(f)
         print("%-22s -> page_%03d + page_%03d   fold at x=%d of %d%s"
