@@ -678,8 +678,10 @@ document.addEventListener("keydown",e=>{
  if(e.key==="ArrowRight")jump(1);});
 // A hidden window keeps its mic and voice unless told otherwise, and two
 // copies of the page then fight over both. Going invisible means pause.
+let autoPaused=false;
 document.addEventListener("visibilitychange",()=>{
- if(document.hidden&&running&&!paused)pause();});
+ if(document.hidden&&running&&!paused){pause();autoPaused=true;}
+ else if(!document.hidden&&running&&paused&&autoPaused){autoPaused=false;resume();}});
 startbtn.onclick=()=>start(currentSet());
 // Changing the scene or mode mid-run: the queue was built at Start, so
 // the old run would keep playing ("stuck on whatever the line is").
@@ -699,7 +701,7 @@ function pause(){if(paused)return;paused=true;token++;judging=false;
  speechSynthesis.cancel();
  if(rec)try{rec.abort();}catch(_){/**/}
  my.textContent="Paused.";}
-function resume(){if(!paused)return;paused=false;
+function resume(){if(!paused)return;paused=false;autoPaused=false;
  pausebtn.textContent="\\u23F8";pausebtn.title="pause";
  my.textContent="";
  if(rec)try{rec.start();}catch(_){/**/}
