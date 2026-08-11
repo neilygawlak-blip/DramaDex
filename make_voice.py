@@ -199,10 +199,11 @@ def main():
             print("  ... and %d more" % (len(todo) - 10))
         return
 
-    # torchaudio decodes the reference through torchcodec, which loads
-    # FFmpeg's shared DLLs off PATH (the plain Gyan build is static and
-    # has none). Put every ffmpeg bin dir we can find in front, the
-    # shared build included; pydub inside f5_tts wants the same.
+    # torchaudio decodes the reference through torchcodec, which needs
+    # FFmpeg's shared DLLs (the plain Gyan build is static and has
+    # none). Python 3.8+ ignores in-process PATH changes for DLL
+    # dependency resolution, so register every ffmpeg bin dir with
+    # add_dll_directory as well; PATH still helps pydub find ffmpeg.exe.
     dll_dirs = {os.path.dirname(ff)}
     dll_dirs.update(os.path.dirname(p) for p in glob.glob(os.path.join(
         os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet",
@@ -210,6 +211,8 @@ def main():
         recursive=True))
     os.environ["PATH"] = (os.pathsep.join(sorted(dll_dirs, reverse=True))
                           + os.pathsep + os.environ["PATH"])
+    for d in dll_dirs:
+        os.add_dll_directory(d)
 
     try:
         from f5_tts.api import F5TTS
