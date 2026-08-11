@@ -309,9 +309,13 @@ TEMPLATE = """<!DOCTYPE html>
  #ctxbtn{position:fixed;bottom:1.7rem;right:5.1rem;font-size:.75rem;
       padding:.3rem .7rem;color:#7d87a3;border-radius:999px;
       background:#0d1526;box-shadow:0 2px 8px rgba(0,0,0,.5)}
- #ctx{display:none;font-size:.85rem;color:#8d97b8;border-left:2px solid #2b3a5e;
-      padding-left:.7rem;margin:.5rem 0 1rem}
- #ctx div{margin:.25rem 0}
+ #ctx{display:none;position:fixed;inset:7% 5%;overflow-y:auto;z-index:9;
+      background:#0d1526;border:1px solid #3a4a75;border-radius:12px;
+      padding:1rem 1.2rem;font-size:.9rem;color:#c7cee2;
+      box-shadow:0 8px 40px rgba(0,0,0,.8)}
+ #ctx .fsline{margin:.4rem 0}
+ #ctx .fsmine{color:#ffd75e}
+ #ctx .fsnow{outline:1px solid #ffd75e;border-radius:6px;padding:.15rem .35rem;display:inline-block}
  #where{margin-top:1.6rem;font-size:.78rem;letter-spacing:.06em;
       color:#55618a;text-transform:uppercase}
  #pausebtn{position:fixed;bottom:1.2rem;right:1.2rem;width:3.1rem;height:3.1rem;
@@ -321,6 +325,11 @@ TEMPLATE = """<!DOCTYPE html>
  .star{cursor:pointer;border:none;background:none;font-size:1.1rem}
  #mystate{font-size:.85rem;color:#7d87a3}
  .listening{color:#7fe0a7;font-weight:bold}
+ #backbtn{position:fixed;bottom:1.2rem;left:1.2rem;font-size:.75rem;
+      color:#7d87a3;background:#0d1526;border:1px solid #2b3a5e;
+      border-radius:999px;padding:.35rem .8rem;text-decoration:none;
+      box-shadow:0 2px 8px rgba(0,0,0,.5)}
+ #backbtn:hover{border-color:#ffd75e;color:#e8e6df}
 </style></head><body>
 <h1>__AVATAR__ __NAME__ <span class="muted">— See How They Run</span></h1>
 <div class="muted">__COUNT__ lines. Pick a scene, press the pineapple, and
@@ -340,6 +349,7 @@ just speak when it's your turn.</div>
 <div id="mystate"></div>
 <div id="stage"></div>
 <div id="where"></div>
+<a id="backbtn" href="index.html">&#8592; Back to Character List</a>
 <script>
 const DATA=__DATA__;
 const NAME="__NAME__";
@@ -459,16 +469,25 @@ function show(l,auto){
  stage.innerHTML='<div class="cue"><span style="font-size:1.6rem">'+(c.mood||"\\u{1F642}")+'</span> '+
   (c.sfx?"\\u{1F514} ":"")+
   (c.speaker?'<span class="cuename">'+av+" "+c.speaker+'.</span> ':"")+esc(c.say)+
-  (l.gap&&l.gap.length?'<button id="ctxbtn">Context</button>':"")+'</div>'+
+  '<button id="ctxbtn">Full Script</button></div>'+
   '<div id="ctx"></div>'+
   '<div id="verdict"></div>'+
   '<div class="mine"><span class="cuename">'+myAv+" "+NAME+'.</span> <span id="diff">'+mine+'</span></div>'+
   (auto?"":'<div id="hints"><button id="wordbtn">Next Word</button> <button id="linebtn">Line</button> <button id="gotbtn">\\u2713 Got it</button></div>');
  const cb=document.getElementById("ctxbtn");
+ // Full Script: the whole selected run, everyone's lines in order, with
+ // the actor's lines gold and the current line boxed. Rebuilt from the
+ // gaps, so nothing new ships in the file.
  if(cb)cb.onclick=()=>{const x=document.getElementById("ctx");
-  if(x.style.display!=="block"){
-   x.innerHTML=l.gap.map(g=>"<div>"+(g.t?esc(g.s+". "+g.t):"\\u{1F514}")+"</div>").join("");
-   x.style.display="block";}else x.style.display="none";};
+  if(x.style.display==="block"){x.style.display="none";return;}
+  let h='<div style="text-align:right;position:sticky;top:0"><button id="fsclose">Close</button></div>';
+  queue.forEach((qi,k)=>{const L=DATA.lines[qi];
+   (L.gap||[]).forEach(g=>{h+='<div class="fsline">'+
+    (g.t?'<b>'+esc(g.s)+'.</b> '+esc(g.t):"\\u{1F514} (sound)")+"</div>";});
+   h+='<div class="fsline fsmine'+(k===pos?" fsnow":"")+'"><b>'+esc(NAME)+'.</b> '+esc(L.say)+'</div>';});
+  x.innerHTML=h;x.style.display="block";
+  document.getElementById("fsclose").onclick=()=>{x.style.display="none";};
+  const now=x.querySelector(".fsnow");if(now)now.scrollIntoView({block:"center"});};
  const wb=document.getElementById("wordbtn"),lb=document.getElementById("linebtn");
  if(wb)wb.onclick=()=>{const nxt=stage.querySelector("#diff .pending:not(.lit):not(.show)");
   if(nxt)nxt.classList.add("show");};
@@ -535,7 +554,7 @@ function step(){
   show(l,false);
   const wait=playSfx(l.cue.sfx);
   setTimeout(()=>{if(t!==token||!running||paused)return;
-   speak(l.cue.say,l.cue.pace,l.cue.speaker,()=>{if(t!==token)return;
+   speak(l.cue.say,l.cue.pace,l.cue.speaker,()=>{if(t!==token||!running||paused)return;
     judging=true;
     my.textContent=rec?"":"No mic here: say it out loud anyway, then \\u25B6";});},wait);
  }else{
@@ -579,6 +598,7 @@ function doneEnough(l){
 function start(q){
  queue=q||currentSet();if(!queue.length){my.textContent="Nothing in that run.";return;}
  pos=0;running=true;paused=false;
+ pausebtn.textContent="\\u23F8";pausebtn.title="pause";
  startbtn.style.display="none";pausebtn.style.display="";
  prevbtn.style.display="";nextbtn.style.display="";
  // Phones only let audio begin inside a real tap: wake the effects
@@ -593,8 +613,9 @@ function stop(){running=false;startbtn.style.display="";pausebtn.style.display="
  if(rec){rec.onend=null;rec.stop();rec=null;}}
 function jump(d){if(!running)return;speechSynthesis.cancel();judging=false;
  // Stepping forward off the last line is how a run ends, not a wall.
- pos=Math.max(0,Math.min(queue.length,pos+d));paused=false;
- pausebtn.textContent="\\u23F8";pausebtn.title="pause";
+ pos=Math.max(0,Math.min(queue.length,pos+d));
+ if(paused){paused=false;if(rec)try{rec.start();}catch(_){/**/}}
+ pausebtn.textContent="\\u23F8";pausebtn.title="pause";my.textContent="";
  // A breath between cancel and the next speak, or Chrome eats the speak.
  token++;setTimeout(step,150);}
 prevbtn.onclick=()=>jump(-1);nextbtn.onclick=()=>jump(1);
@@ -605,13 +626,24 @@ document.addEventListener("keydown",e=>{
 // A hidden window keeps its mic and voice unless told otherwise, and two
 // copies of the page then fight over both. Going invisible means pause.
 document.addEventListener("visibilitychange",()=>{
- if(document.hidden&&running&&!paused){paused=true;
-  pausebtn.textContent="\\u25B6";pausebtn.title="resume";
-  speechSynthesis.cancel();judging=false;}});
+ if(document.hidden&&running&&!paused)pause();});
 startbtn.onclick=()=>start(currentSet());
-pausebtn.onclick=()=>{paused=!paused;pausebtn.textContent=paused?"\\u25B6":"\\u23F8";
- pausebtn.title=paused?"resume":"pause";
- if(paused){speechSynthesis.cancel();judging=false;}else step();};
+// Pause must actually kill the run in flight: bump the token so every
+// pending timer and speech callback goes stale, silence the voice, and
+// release the mic. Without the token bump, cancelling the speech fires
+// its done-callback, which flips judging back on — the page kept
+// listening and reacting while "paused".
+function pause(){if(paused)return;paused=true;token++;judging=false;
+ pausebtn.textContent="\\u25B6";pausebtn.title="resume";
+ speechSynthesis.cancel();
+ if(rec)try{rec.abort();}catch(_){/**/}
+ my.textContent="Paused.";}
+function resume(){if(!paused)return;paused=false;
+ pausebtn.textContent="\\u23F8";pausebtn.title="pause";
+ my.textContent="";
+ if(rec)try{rec.start();}catch(_){/**/}
+ step();}
+pausebtn.onclick=()=>{paused?resume():pause();};
 
 function initMic(){
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -627,7 +659,7 @@ function initMic(){
  rec.onerror=e=>{if(e.error==="not-allowed"||e.error==="service-not-allowed"||e.error==="audio-capture"){
   if(rec){rec.onend=null;try{rec.abort();}catch(_){/**/}}rec=null;
   if(judging)my.textContent="No mic here: say it out loud anyway, then \\u25B6";}};
- rec.onend=()=>{if(running&&rec)try{rec.start();}catch(_){/**/}};
+ rec.onend=()=>{if(running&&!paused&&rec)try{rec.start();}catch(_){/**/}};
  try{rec.start();}catch(_){rec=null;}
 }
 </script></body></html>
@@ -638,7 +670,11 @@ def main():
     if len(sys.argv) != 4:
         sys.exit(__doc__)
     rawfile, castfile, outdir = sys.argv[1:4]
-    cast = [l.strip() for l in open(castfile, encoding="utf-8") if l.strip()]
+    # utf-8-sig: Windows editors and PowerShell love to prepend a BOM, and
+    # an invisible byte glued to the first name silently drops that
+    # character's every line.
+    cast = [l.strip() for l in open(castfile, encoding="utf-8-sig")
+            if l.strip()]
     speeches = parse(rawfile, cast)
     os.makedirs(outdir, exist_ok=True)
 
