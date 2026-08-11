@@ -350,15 +350,18 @@ TEMPLATE = """<!DOCTYPE html>
       padding:.06rem .55rem;border:1px solid #3a4a75;border-radius:999px;
       background:#131d38;box-shadow:0 2px 8px rgba(0,0,0,.55),
       0 0 6px rgba(255,183,71,.12)}
- #verdict{font-size:2.2rem;margin:.5rem 0;min-height:2.6rem}
- #verdict svg{width:2.6rem;height:2.6rem;vertical-align:middle}
- #verdict .ccirc{stroke:#7fe0a7;stroke-width:2.5;fill:none;opacity:.45;
+ #verdict{font-size:2.2rem;margin:.5rem 0}
+ #nailfx{position:fixed;bottom:4.4rem;left:0;right:0;text-align:center;
+      pointer-events:none;z-index:8}
+ #nailfx svg{width:2.6rem;height:2.6rem;animation:nailfade .9s forwards}
+ #nailfx .ccirc{stroke:#7fe0a7;stroke-width:2.5;fill:none;opacity:.45;
       stroke-dasharray:151;stroke-dashoffset:151;animation:cdraw .25s ease-out forwards}
- #verdict .cmark{stroke:#7fe0a7;stroke-width:4;stroke-linecap:round;
+ #nailfx .cmark{stroke:#7fe0a7;stroke-width:4;stroke-linecap:round;
       stroke-linejoin:round;fill:none;stroke-dasharray:36;stroke-dashoffset:36;
       animation:cdraw .2s .12s ease-out forwards;
       filter:drop-shadow(0 0 6px rgba(127,224,167,.7))}
  @keyframes cdraw{to{stroke-dashoffset:0}}
+ @keyframes nailfade{0%,60%{opacity:1}100%{opacity:0}}
  #diff span.ok{color:#7fe0a7}
  #diff span.pending{color:transparent;border-bottom:1px dotted #3a4a75}
  #diff span.pending.lit{color:#7fe0a7;border-bottom:none}
@@ -428,6 +431,7 @@ just speak when it's your turn.</div>
 <div id="mystate"></div>
 <div id="stage"></div>
 <div id="where"></div>
+<div id="nailfx"></div>
 <a id="backbtn" href="index.html">&#8592; Back to Character List</a>
 <a id="reportbtn" href="#">&#9888; Tell Neil it broke</a>
 <div id="build">build __BUILD__</div>
@@ -771,22 +775,29 @@ function step(){
  }
 }
 
+let nailT=0;
 function judged(l,text){
  judging=false;const g=grade(l.say,text);
- const v=document.getElementById("verdict");
- v.innerHTML=g.nailed?'<svg viewBox="0 0 52 52">'+
-  '<circle class="ccirc" cx="26" cy="26" r="24"/>'+
-  '<path class="cmark" d="M15 27l8 8 15-16"/></svg>':"";
+ // The check floats OVER the run: the next line starts underneath it
+ // immediately, and it draws, lingers a beat, and fades on its own.
+ if(g.nailed){
+  const fx=document.getElementById("nailfx");
+  fx.innerHTML='<svg viewBox="0 0 52 52">'+
+   '<circle class="ccirc" cx="26" cy="26" r="24"/>'+
+   '<path class="cmark" d="M15 27l8 8 15-16"/></svg>';
+  clearTimeout(nailT);
+  nailT=setTimeout(()=>{fx.innerHTML="";},950);
+ }
  // Only the words they landed light up. A missed word stays a blank
  // slot rather than a red spoiler: hints are given when asked for,
  // never as a punishment.
  lightUp(text);
  my.textContent="";
  const t=token;
- // Farce pacing wins over feedback-reading (Chris's call): just enough
- // of a beat for the check to draw, then straight on. The left arrow is
- // the way back when a line deserves another pass.
- setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},400);
+ // No beat at all (Chris's call): the next cue starts the moment the
+ // line lands. The check draws while it talks; the left arrow is the
+ // way back when a line deserves another pass.
+ setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},0);
 }
 
 function lev(a,b){if(a===b)return 0;let p=[...Array(b.length+1).keys()];
