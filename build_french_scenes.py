@@ -79,7 +79,10 @@ TEMPLATE = """<!DOCTYPE html>
  <button id="clear">Clear all</button>
  <label class="hint">trivial part &le; <input id="minlines" type="number" value="4" min="0" style="width:3.2rem"> lines</label>
  <button class="primary" id="groups">Suggest groups</button>
- <button id="export">Export JSON</button>
+ <button class="primary" id="ship">Ship PDF + PNG</button>
+ <button class="primary" id="email">Email it</button>
+ <button id="word">Word</button>
+ <button id="export">JSON</button>
  <label class="hint">import <input id="importfile" type="file" accept=".json" style="width:11rem"></label>
 </div>
 <div id="wrap">
@@ -267,6 +270,131 @@ document.getElementById("fill").onclick=()=>{
  planEl.value=(planEl.value.trim()+add).trim();
  planEl.oninput();checkPlan();
 };
+// ---- shipping: the finished, human-readable version ----
+function shareText(){
+ const ordered=[...bounds].sort((a,b)=>a-b);
+ let out="FRENCH SCENES \\u2014 See How They Run\\n";
+ out+="\\u2500".repeat(38)+"\\n";
+ ordered.forEach((i,k)=>{
+  const p=P.paras[i];
+  const prev=P.paras[i-1];
+  let after="the top";
+  if(prev){
+   const t=prev.text.replace(/\\s+/g," ").trim();
+   after=(prev.speaker?prev.speaker+": ":"")+"\\u2026"+t.slice(-55);
+  }
+  const opens=(p.speaker?p.speaker+": ":"")+p.text.replace(/\\s+/g," ").slice(p.speaker?p.speaker.length+1:0,90).trim();
+  out+="\\nSCENE "+(k+1)+" \\u2014 "+p.act+", p."+p.page+", "+(p.loc||"")+" the page\\n";
+  out+="  starts after  "+after+"\\n";
+  out+="  opens with    "+opens+"\\u2026\\n";
+ });
+ const plan=planEl.value.trim();
+ if(plan)out+="\\n\\nTHE PLAN\\n"+"\\u2500".repeat(38)+"\\n"+plan+"\\n";
+ return out;
+}
+function dl(name,blob){const a=document.createElement("a");
+ a.href=URL.createObjectURL(blob);a.download=name;a.click();}
+// ---- a real modern .docx: a stored zip of three small XML files ----
+const CRCT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;
+ for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+function crc32(b){let c=0xFFFFFFFF;
+ for(let i=0;i<b.length;i++)c=CRCT[(c^b[i])&0xFF]^(c>>>8);
+ return (c^0xFFFFFFFF)>>>0;}
+function zip(files){
+ const enc=new TextEncoder();const parts=[];const cdir=[];let off=0;
+ const u16=v=>[v&255,v>>8&255];const u32=v=>[v&255,v>>8&255,v>>16&255,v>>>24&255];
+ files.forEach(([name,txt])=>{
+  const nb=enc.encode(name),db=enc.encode(txt),crc=crc32(db);
+  const head=[80,75,3,4,...u16(20),...u16(0),...u16(0),...u16(0),...u16(0),
+   ...u32(crc),...u32(db.length),...u32(db.length),...u16(nb.length),...u16(0)];
+  parts.push(new Uint8Array(head),nb,db);
+  cdir.push({nb,crc,len:db.length,off});
+  off+=head.length+nb.length+db.length;});
+ let cstart=off,clen=0;
+ cdir.forEach(e=>{
+  const h=[80,75,1,2,...u16(20),...u16(20),...u16(0),...u16(0),...u16(0),...u16(0),
+   ...u32(e.crc),...u32(e.len),...u32(e.len),...u16(e.nb.length),...u16(0),...u16(0),
+   ...u16(0),...u16(0),...u32(0),...u32(e.off)];
+  parts.push(new Uint8Array(h),e.nb);clen+=h.length+e.nb.length;});
+ parts.push(new Uint8Array([80,75,5,6,...u16(0),...u16(0),...u16(cdir.length),
+  ...u16(cdir.length),...u32(clen),...u32(cstart),...u16(0)]));
+ return new Blob(parts,{type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+}
+function docx(text){
+ const xesc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+ const body=text.split("\\n").map(l=>
+  '<w:p><w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/></w:rPr>'+
+  '<w:t xml:space="preserve">'+xesc(l)+"</w:t></w:r></w:p>").join("");
+ return zip([
+  ["[Content_Types].xml",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+   '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+   '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+   '<Default Extension="xml" ContentType="application/xml"/>'+
+   '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'],
+  ["_rels/.rels",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+   '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
+  ["word/document.xml",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+   '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'+
+   "<w:body>"+body+"</w:body></w:document>"],
+ ]);
+}
+// ---- a real PDF, built by hand: the format every device opens ----
+function pdfSafe(s){return s.replace(/\\u2500/g,"-").replace(/\\u2014/g,"--")
+ .replace(/\\u2026/g,"...").replace(/\\u26A0/g,"!").replace(/\\u00b7/g,".")
+ .replace(/[^\\x20-\\x7E\\n]/g,"?");}
+function pdf(text){
+ const lines=pdfSafe(text).split("\\n");
+ const perPage=52,chunks=[];
+ for(let i=0;i<lines.length;i+=perPage)chunks.push(lines.slice(i,i+perPage));
+ const esc=s=>s.replace(/\\\\/g,"\\\\\\\\").replace(/\\(/g,"\\\\(").replace(/\\)/g,"\\\\)");
+ const objs=[];const add=s=>{objs.push(s);return objs.length;};
+ const fontId=add("<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>");
+ const pageIds=[],contentIds=[];
+ chunks.forEach(ch=>{
+  let st="BT /F1 11 Tf 13 TL 50 742 Td\\n";
+  ch.forEach(l=>{st+="("+esc(l)+") Tj T*\\n";});
+  st+="ET";
+  contentIds.push(add("<< /Length "+st.length+" >>\\nstream\\n"+st+"\\nendstream"));
+ });
+ const pagesId=objs.length+chunks.length+1;
+ chunks.forEach((_,k)=>{
+  pageIds.push(add("<< /Type /Page /Parent "+pagesId+" 0 R /MediaBox [0 0 612 792]"+
+   " /Resources << /Font << /F1 "+fontId+" 0 R >> >> /Contents "+contentIds[k]+" 0 R >>"));
+ });
+ add("<< /Type /Pages /Kids ["+pageIds.map(i=>i+" 0 R").join(" ")+"] /Count "+pageIds.length+" >>");
+ const catId=add("<< /Type /Catalog /Pages "+pagesId+" 0 R >>");
+ let out="%PDF-1.4\\n";const offs=[0];
+ objs.forEach((o,i)=>{offs.push(out.length);out+=(i+1)+" 0 obj\\n"+o+"\\nendobj\\n";});
+ const xref=out.length;
+ out+="xref\\n0 "+(objs.length+1)+"\\n0000000000 65535 f \\n";
+ for(let i=1;i<=objs.length;i++)out+=String(offs[i]).padStart(10,"0")+" 00000 n \\n";
+ out+="trailer\\n<< /Size "+(objs.length+1)+" /Root "+catId+" 0 R >>\\nstartxref\\n"+xref+"\\n%%EOF";
+ return new Blob([out],{type:"application/pdf"});
+}
+document.getElementById("word").onclick=()=>dl("french_scenes.docx",docx(shareText()));
+document.getElementById("ship").onclick=()=>{
+ const text=shareText();
+ dl("french_scenes.pdf",pdf(text));
+ // The PNG: same content drawn in house colours, phone-shareable.
+ const lines=text.split("\\n");
+ const cv=document.createElement("canvas");
+ const lh=26,pad=40;cv.width=1050;cv.height=pad*2+lines.length*lh;
+ const g=cv.getContext("2d");
+ g.fillStyle="#0a0f1e";g.fillRect(0,0,cv.width,cv.height);
+ lines.forEach((l,i)=>{
+  g.font=(i===0?"bold 22px":"16px")+" Consolas,monospace";
+  g.fillStyle=i===0?"#ffd75e":l.startsWith("SCENE")||l.startsWith("THE PLAN")?"#ffd75e":"#c9d2ea";
+  g.fillText(l,pad,pad+i*lh+18);});
+ cv.toBlob(b=>dl("french_scenes.png",b),"image/png");
+};
+document.getElementById("email").onclick=()=>{
+ let text=shareText();
+ const MAX=1700;
+ if(text.length>MAX)text=text.slice(0,MAX)+"\\n\\u2026(full version in the attached Word/PNG files \\u2014 use the Word + PNG button, then drag them in)";
+ location.href="mailto:?subject="+encodeURIComponent("French scenes \\u2014 See How They Run")+
+  "&body="+encodeURIComponent(text);
+};
 document.getElementById("importfile").onchange=e=>{
  const f=e.target.files[0];if(!f)return;
  f.text().then(t=>{const d=JSON.parse(t);
@@ -303,6 +431,19 @@ def main():
         # at the NEXT paragraph, which is where the new grouping begins.
         if ENTER_EXIT.search(s["text"]):
             suggested.append(i + 1)
+    # Where on its printed page each paragraph sits, in the words a person
+    # flipping the book actually uses.
+    by_page = {}
+    for i, p in enumerate(paras):
+        by_page.setdefault(p["page"], []).append(i)
+    for page, idxs in by_page.items():
+        for j, i in enumerate(idxs):
+            f = j / max(1, len(idxs) - 1) if len(idxs) > 1 else 0
+            paras[i]["loc"] = ("top of" if f < .2 else
+                               "a quarter down" if f < .45 else
+                               "halfway down" if f < .7 else
+                               "three quarters down" if f < .9 else
+                               "bottom of")
     suggested = sorted({j for j in suggested if j < len(paras)})
     pages = [p["page"] for p in paras if p["page"]]
     data = {"paras": paras, "suggested": suggested,
