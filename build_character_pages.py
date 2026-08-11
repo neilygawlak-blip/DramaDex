@@ -193,9 +193,10 @@ def parse(rawfile, cast):
                 and any(c.islower() for c in p)):
             prev = speeches[-1]
             prev["text"] += " " + p
-            extra = spoken(p, "")
-            if extra:
-                prev["say"] = (prev["say"] + " " + extra).strip()
+            # Recompute the say from the JOINED text: a direction split
+            # across the seam has unbalanced halves, and stripping the
+            # fragments separately leaked both halves into the spoken line.
+            prev["say"] = spoken(prev["text"], prev["speaker"])
             prev["sfx"] = prev["sfx"] or sfx
             continue
         speeches.append({
@@ -656,8 +657,16 @@ function doneEnough(l){
  if(!H.length)return false;
  const last=E[E.length-1];
  const tol=last.length>=5?1:0;
- return H.slice(-2).some(h=>h===last||(tol&&lev(h,last)<=tol)
+ const endsRight=H.slice(-2).some(h=>h===last||(tol&&lev(h,last)<=tol)
   ||(last.length>2&&pkey(h)===pkey(last)));
+ if(!endsRight)return false;
+ // A repeated word must not end the line early: "WE will get it ...
+ // what is it?" says "it" at word four. The ending only counts once
+ // most of the line is behind them. Three words or fewer are exempt.
+ if(E.length<=3)return true;
+ const hset=new Set(H);
+ const hit=E.filter(w=>hset.has(w)).length;
+ return hit/E.length>=.55;
 }
 
 function start(q){
