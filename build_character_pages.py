@@ -1102,8 +1102,10 @@ function render(){
  DATA.items.forEach((it,i)=>{
   if(it.act&&it.act!==act){act=it.act;h+='<div class="acthead">'+act+"</div>";}
   if(!it.t){h+='<div class="row sfx" data-i="'+i+'">\\u{1F514} (sound: '+it.x+')</div>';return;}
-  const av=DATA.avatars&&DATA.avatars[it.s]||"";
-  h+='<div class="row" data-i="'+i+'"><span class="nm">'+av+" "+it.s+'.</span>'+esc(it.t)+"</div>";
+  const together=it.sim&&it.sim.length;
+  const av=together?"\\u{1F5E3}":(DATA.avatars&&DATA.avatars[it.s]||"");
+  const names=together?[it.s].concat(it.sim.map(p=>p.s)).join(" + "):it.s;
+  h+='<div class="row" data-i="'+i+'"><span class="nm">'+av+" "+names+'.</span>'+esc(it.t)+"</div>";
  });
  scriptEl.innerHTML=h;
 }
@@ -1141,6 +1143,14 @@ function step(){
   setTimeout(()=>{if(t===token&&running&&!paused){idx++;step();}},w+200);return;}
  const w=playSfx(it.x);
  setTimeout(()=>{if(t!==token||!running||paused)return;
+  // Together partners sound at the same moment. A partner with a real
+  // clip overlays fine; a robot partner saying the IDENTICAL words is
+  // skipped, because browser TTS is single-channel and would just say
+  // the line twice in a row (and sometimes froze the queue doing it).
+  (it.sim||[]).forEach(p=>{
+   if((voxchk.checked&&VOX.has(p.s+"/"+p.l))||p.t!==it.t)
+    speak(p.t,p.p,p.s,()=>{},p.l);
+  });
   speak(it.t,it.p,it.s,()=>{if(t===token&&running&&!paused){idx++;
    setTimeout(step,120);}},it.l);},w);
 }
@@ -1202,10 +1212,22 @@ def build_read_through(speeches, outdir, build):
     items = []
     for s in speeches:
         if s["speaker"] and s["say"]:
-            items.append({"s": s["speaker"], "t": s["say"],
-                          "l": line_id(s["speaker"], s["say"]),
-                          "p": pace_of(s["text"]), "x": s["sfx"],
-                          "act": s["act"]})
+            ent = {"s": s["speaker"], "t": s["say"],
+                   "l": line_id(s["speaker"], s["say"]),
+                   "p": pace_of(s["text"]), "x": s["sfx"],
+                   "act": s["act"]}
+            # A together group is ONE moment here: the partners simply
+            # sound at the same time, like on stage. (The practice
+            # pages' wait-for-the-runner machinery has no place in a
+            # listen-along and froze it.)
+            if (s.get("gid") and items
+                    and items[-1].get("gid") == s["gid"]):
+                items[-1]["sim"].append(ent)
+                continue
+            if s.get("gid"):
+                ent["gid"] = s["gid"]
+                ent["sim"] = []
+            items.append(ent)
         elif s["sfx"]:
             items.append({"s": "", "t": "", "x": s["sfx"],
                           "act": s["act"]})
