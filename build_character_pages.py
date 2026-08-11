@@ -402,9 +402,44 @@ function playSfx(n){if(!n)return 0;if(!AC)AC=new (window.AudioContext||window.we
 // ---- forgiving word diff, the workbench tiers ----
 const norm=s=>s.toLowerCase().replace(/[^a-z0-9' ]+/g," ").replace(/\\s+/g," ").trim();
 const FILLERS=new Set(["er","um","uh","erm","like","well"]);
+// Phonetic key (metaphone-style consonant skeleton). The recognizer
+// mishears an accented or mumbled word as a *soundalike* real word:
+// this/these, wish/which, knot/not, four/for. Two words with the same
+// key count as the same word. A paraphrase still fails, because
+// different words make different sounds: forgives the accent, never
+// the wording.
+function pkey(w){
+ w=w.toLowerCase().replace(/[^a-z]/g,"");
+ if(!w)return"";
+ w=w.replace(/^kn|^gn/,"n").replace(/^wr/,"r").replace(/^ps/,"s").replace(/^wh/,"w");
+ w=w.replace(/mb$/,"m").replace(/tion|sion/g,"xn");
+ w=w.replace(/sch/g,"sk").replace(/ch|sh/g,"x").replace(/th/g,"t");
+ w=w.replace(/ph/g,"f").replace(/gh$/,"f").replace(/gh/g,"");
+ w=w.replace(/ck/g,"k").replace(/c(?=[iey])/g,"s").replace(/c/g,"k").replace(/q/g,"k").replace(/x/g,"ks");
+ w=w.replace(/dg/g,"j").replace(/g(?=[iey])/g,"j");
+ w=w.replace(/z/g,"s").replace(/v/g,"f").replace(/d/g,"t").replace(/b/g,"p").replace(/(.)h/g,"$1");
+ if(w.length>3)w=w.replace(/s$/,"");
+ const first=w[0]||"";
+ w=(first+w.slice(1).replace(/[aeiouy]/g,"")).replace(/(.)\\1+/g,"$1");
+ return w;
+}
+// True homophones the skeleton cannot merge (two/too) fold to one
+// spelling before any comparison.
+const HC={two:"to",too:"to",their:"there",your:"youre",hear:"here",
+ know:"no",won:"one",wear:"where",whose:"whos",knew:"new",ate:"eight"};
+const canon=w=>HC[w.replace(/'/g,"")]||w;
+// A heard word matches a script word by spelling OR by sound. Sound
+// matches only count for words of 3+ letters: tiny words collapse to
+// near-nothing phonetically and would match anything.
+function soundSets(H){
+ H=H.map(canon);
+ return {hset:new Set(H),pset:new Set(H.map(pkey).filter(k=>k.length>1))};
+}
+const wordOk=(w,S)=>{w=canon(w);
+ return S.hset.has(w)||(w.length>2&&S.pset.has(pkey(w)));};
 function grade(expected,heard){
  const E=norm(expected).split(" ").filter(w=>w),H=norm(heard).split(" ").filter(w=>!FILLERS.has(w));
- const hset=new Set(H);let hit=0;const marks=E.map(w=>{const ok=hset.has(w);if(ok)hit++;return {w,ok};});
+ const S=soundSets(H);let hit=0;const marks=E.map(w=>{const ok=wordOk(w,S);if(ok)hit++;return {w,ok};});
  const r=E.length?hit/E.length:1;
  return {tier:r>=.9?"\\u{1F3AF} Nailed it":r>=.65?"\\u{1F642} Close":"\\u{1F501} Not yet",marks,r};
 }
@@ -499,9 +534,9 @@ function show(l,auto){
   speechSynthesis.cancel();token++;pos++;setTimeout(step,150);};
 }
 function lightUp(text){
- const hset=new Set(norm(text).split(" "));
+ const S=soundSets(norm(text).split(" "));
  stage.querySelectorAll("#diff .pending").forEach(s=>{
-  if(hset.has(s.textContent))s.classList.add("lit");});
+  if(wordOk(s.textContent,S))s.classList.add("lit");});
 }
 const esc=s=>s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 
@@ -592,7 +627,8 @@ function doneEnough(l){
  if(!H.length)return false;
  const last=E[E.length-1];
  const tol=last.length>=5?1:0;
- return H.slice(-2).some(h=>h===last||(tol&&lev(h,last)<=tol));
+ return H.slice(-2).some(h=>h===last||(tol&&lev(h,last)<=tol)
+  ||(last.length>2&&pkey(h)===pkey(last)));
 }
 
 function start(q){
@@ -628,6 +664,14 @@ document.addEventListener("keydown",e=>{
 document.addEventListener("visibilitychange",()=>{
  if(document.hidden&&running&&!paused)pause();});
 startbtn.onclick=()=>start(currentSet());
+// Changing the scene or mode mid-run: the queue was built at Start, so
+// the old run would keep playing ("stuck on whatever the line is").
+// Halt cleanly and hand back the pineapple, aimed at the new pick.
+function halt(){token++;speechSynthesis.cancel();judging=false;paused=false;
+ stop();stage.innerHTML="";whereEl.textContent="";
+ my.textContent="\\u{1F34D} Press Start to run this selection.";}
+scope.onchange=()=>{if(running)halt();};
+mode.onchange=()=>{if(running)halt();};
 // Pause must actually kill the run in flight: bump the token so every
 // pending timer and speech callback goes stale, silence the voice, and
 // release the mic. Without the token bump, cancelling the speech fires
