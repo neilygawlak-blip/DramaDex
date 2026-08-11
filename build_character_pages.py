@@ -130,7 +130,9 @@ AVATARS = {
     "CLIVE":        "\U0001F396️✝",  # decorated airman, borrowed dog collar
     "BISHOP":       "✝\U0001F458",       # bishop in pyjamas and robe
     "HUMPHREY":     "✝\U0001F9E3",       # the mild one with the muffler
-    "MAN":          "\U0001F17F️\U0001F52B",  # dungarees marked P, revolver
+    # Windows shows flag emoji as the letters "RU" (no flag glyphs on
+    # desktop Windows at all); phones render the actual flag.
+    "MAN":          "\U0001F1F7\U0001F1FA\U0001F52B",  # Russian, revolver
     "SERGEANT":     "\U0001F46E\U0001F4D3",   # copper with his notebook
     "CHOIRBOY":     "\U0001F466\U0001F3B6",   # Willie, heard singing off
     # Not a person: the eleventh "cast member" is the whole play,
