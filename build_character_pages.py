@@ -448,7 +448,22 @@ function pkey(w){
 // spelling before any comparison.
 const HC={two:"to",too:"to",their:"there",your:"youre",hear:"here",
  know:"no",won:"one",wear:"where",whose:"whos",knew:"new",ate:"eight"};
-const canon=w=>HC[w.replace(/'/g,"")]||w;
+// Dialect equivalence: the page DISPLAYS the line as printed ('aven't,
+// goin', wot) but the recognizer transcribes standard English, so both
+// sides of every comparison fold to the proper word. Ida speaks cockney;
+// her actor should not be punished for saying it right.
+const DMAP={wot:"what",orl:"all",fur:"for",praps:"perhaps",oo:"who",
+ salright:"alright",gawd:"god",lor:"lord",arf:"half",nuffink:"nothing",
+ yer:"your",ome:"home",ot:"hot",eaven:"heaven",ell:"hell"};
+function canon(w){
+ const bare0=w.replace(/'/g,"");
+ if(w.endsWith("'m")&&w.length>2)w=w.slice(0,-2);   // yes'm -> yes
+ if(w.endsWith("in'"))w=w.slice(0,-1)+"g";          // goin' -> going
+ if(w.startsWith("'")&&w.length>1)w="h"+w.slice(1); // 'aven't -> haven't
+ let b=w.replace(/'/g,"");
+ if(DMAP[bare0]!==undefined)b=DMAP[bare0];
+ return HC[b]||b;
+}
 // A heard word matches a script word by spelling OR by sound. Sound
 // matches only count for words of 3+ letters: tiny words collapse to
 // near-nothing phonetically and would match anything.
@@ -655,17 +670,17 @@ function doneEnough(l){
  if(!E.length)return true;
  const H=norm(heard).split(" ").filter(w=>w);
  if(!H.length)return false;
- const last=E[E.length-1];
+ const last=canon(E[E.length-1]);
  const tol=last.length>=5?1:0;
- const endsRight=H.slice(-2).some(h=>h===last||(tol&&lev(h,last)<=tol)
+ const endsRight=H.slice(-2).map(canon).some(h=>h===last||(tol&&lev(h,last)<=tol)
   ||(last.length>2&&pkey(h)===pkey(last)));
  if(!endsRight)return false;
  // A repeated word must not end the line early: "WE will get it ...
  // what is it?" says "it" at word four. The ending only counts once
  // most of the line is behind them. Three words or fewer are exempt.
  if(E.length<=3)return true;
- const hset=new Set(H);
- const hit=E.filter(w=>hset.has(w)).length;
+ const S=soundSets(H);
+ const hit=E.filter(w=>wordOk(w,S)).length;
  return hit/E.length>=.55;
 }
 
