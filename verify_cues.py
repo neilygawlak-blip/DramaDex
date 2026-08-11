@@ -66,8 +66,13 @@ def check_and_fix(paras, cast):
     speech_re = make_speech_re(cast)
     # mid-paragraph speech start: sentence break, then a cast name, then
     # ". " or " (" — the shape of a printed speech opening.
-    mid_re = re.compile(r"([.!?\"'\)])\s+(%s)(\s*\(|[.:]\s)" % "|".join(
-        re.escape(c) for c in sorted(cast, key=len, reverse=True)))
+    # a real speech opening after the name is a period/colon, or a
+    # parenthetical direction followed by an UPPERCASE start ("CLIVE
+    # (drily). Words"). A name whose paren is followed by lowercase is a
+    # character moving inside a stage direction, not dialogue.
+    mid_re = re.compile(r"([.!?\"'\)])\s+(%s)(\s*\([^)]*\)[.:]?\s+(?=[A-Z\"'])|[.:]\s)"
+                        % "|".join(re.escape(c)
+                                   for c in sorted(cast, key=len, reverse=True)))
     tag_re = re.compile(r"^([A-Z][A-Za-z. ]{1,16}?)[.:]\s")
 
     # page furniture: running heads and page numbers photographed into the
