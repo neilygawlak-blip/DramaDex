@@ -32,6 +32,7 @@ Usage:
 """
 
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -78,6 +79,14 @@ MOODS = [
 ]
 MOODS = [(e, re.compile(rx, re.I)) for e, rx in MOODS]
 NEUTRAL = "\U0001F642"
+
+
+def line_id(speaker, say):
+    """Stable id for a spoken line: changes only when the words change.
+    Keys the pre-rendered real-voice clips (voices/<CHAR>/<id>.mp3), so a
+    text edit invalidates exactly that one clip and nothing else."""
+    h = hashlib.sha1(("%s|%s" % (speaker, say)).encode("utf-8"))
+    return h.hexdigest()[:10]
 
 
 def mood_of(text):
@@ -268,7 +277,10 @@ def cue_for(speeches, i):
             tail = s["say"]
             if len(tail) > 160:
                 tail = "\u2026 " + tail[-160:]
+            # The clip id keys the FULL line: the recorded voice plays the
+            # whole cue even where the display shows only the tail.
             return {"speaker": s["speaker"], "say": tail,
+                    "l": line_id(s["speaker"], s["say"]),
                     "sfx": speeches[i - 1]["sfx"] or s["sfx"],
                     "mood": mood_of(s["text"]),
                     "pace": pace_of(s["text"])}
@@ -360,6 +372,8 @@ just speak when it's your turn.</div>
   <option value="scene">Full scene (waits for you)</option>
   <option value="listen">Listen through</option>
  </select>
+ <label id="voxwrap" style="display:none;font-size:.85rem;color:#9aa4c0">
+  <input type="checkbox" id="voxchk" checked> &#127908; Real voices</label>
  <button class="primary" id="startbtn">&#127821; Start</button>
  <button id="prevbtn" style="display:none" title="previous line (left arrow)">&#9664;</button>
  <button id="nextbtn" style="display:none" title="next line (right arrow)">&#9654;</button>
@@ -397,6 +411,25 @@ function currentSet(){
  if(v.startsWith("run:"))return DATA.runs[+v.slice(4)].lines.map(g=>DATA.lines.findIndex(l=>l.i===g)).filter(i=>i>=0);
  return [];
 }
+
+// ---- real cast voices (Neil's Lab) ----
+// voices/manifest.json lists which lines have a pre-rendered clip in the
+// actual actor's voice. On file:// or before any voice exists the fetch
+// fails and every line falls back to the browser voice, silently.
+let VOX=new Set();
+const voxchk=document.getElementById("voxchk");
+fetch("voices/manifest.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(m=>{
+ if(!m)return;
+ for(const[c,ids]of Object.entries(m))ids.forEach(id=>VOX.add(c+"/"+id));
+ if(VOX.size){document.getElementById("voxwrap").style.display="";
+  voxchk.checked=localStorage.getItem("vox")!=="off";}
+}).catch(()=>{});
+voxchk.onchange=()=>localStorage.setItem("vox",voxchk.checked?"on":"off");
+let curClip=null;
+// Everything that silences the browser voice must also silence a playing
+// clip, or "paused" keeps talking in someone's real voice.
+function hush(){speechSynthesis.cancel();
+ if(curClip){curClip.onended=null;curClip.onerror=null;curClip.pause();curClip=null;}}
 
 // ---- tiny synthesized sound effects (no files, nothing to license) ----
 let AC=null;
@@ -512,7 +545,26 @@ function pickVoice(p,who){
 // are squeezed toward normal there: quick stays quicker, nobody gabbles.
 const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)
  ||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
-function speak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynthesisUtterance(t);
+// A line with a rendered clip plays the actor's own voice; anything else
+// (and any clip that fails to load) goes to the browser voice. The farce
+// pace only nudges a recorded human, never drives it, and preservesPitch
+// keeps the voice theirs at any speed.
+function speak(t,pace,who,done,lid){
+ if(!t){done();return;}
+ if(lid&&who&&voxchk.checked&&VOX.has(who+"/"+lid)){
+  const a=new Audio("voices/"+who.replace(/ /g,"_")+"/"+lid+".mp3");
+  curClip=a;a.preservesPitch=true;
+  a.playbackRate=1+((pace||1.3)-1)*.45;
+  let fin=false;
+  const ok=()=>{if(!fin){fin=true;if(curClip===a)curClip=null;done();}};
+  const bad=()=>{if(!fin){fin=true;if(curClip===a)curClip=null;ttsSpeak(t,pace,who,done);}};
+  a.onended=ok;a.onerror=bad;
+  a.play().catch(bad);
+  return;
+ }
+ ttsSpeak(t,pace,who,done);
+}
+function ttsSpeak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynthesisUtterance(t);
  const p=(DATA.voices&&DATA.voices[who])||{g:"m",style:"casual",mult:1};
  const v=pickVoice(p,who);if(v)u.voice=v;
  let r=(pace||1.3)*(p.mult||1);
@@ -567,7 +619,7 @@ function show(l,auto){
  // Got it is the actor vouching for themselves, and the run moves on.
  const gb=document.getElementById("gotbtn");
  if(gb)gb.onclick=()=>{if(!running)return;judging=false;
-  speechSynthesis.cancel();token++;pos++;setTimeout(step,150);};
+  hush();token++;pos++;setTimeout(step,150);};
 }
 function lightUp(text){
  const S=soundSets(norm(text).split(" "));
@@ -590,7 +642,7 @@ function myTurn(l,t,auto){
  if(t!==token||!running)return;
  show(l,auto);
  if(auto){speak(l.say,1.3,NAME,()=>{if(t===token&&running&&!paused)
-   setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},500);});}
+   setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},500);},l.l);}
  else{judging=true;
   my.textContent=rec?"":"No mic here: say it out loud anyway, then \\u25B6";}
 }
@@ -608,7 +660,7 @@ function playGap(l,k,t,auto){
  showGap(g);
  const wait=playSfx(g.x);
  setTimeout(()=>{if(t!==token||!running||paused)return;
-  speak(g.t,g.p,g.s,()=>playGap(l,k+1,t,auto));},wait);
+  speak(g.t,g.p,g.s,()=>playGap(l,k+1,t,auto),g.l);},wait);
 }
 function step(){
  if(!running||paused)return;
@@ -627,7 +679,7 @@ function step(){
   setTimeout(()=>{if(t!==token||!running||paused)return;
    speak(l.cue.say,l.cue.pace,l.cue.speaker,()=>{if(t!==token||!running||paused)return;
     judging=true;
-    my.textContent=rec?"":"No mic here: say it out loud anyway, then \\u25B6";});},wait);
+    my.textContent=rec?"":"No mic here: say it out loud anyway, then \\u25B6";},l.cue.l);},wait);
  }else{
   // Never perform more than the last stretch before their line: a
   // character who enters late would otherwise sit through half the play.
@@ -700,7 +752,7 @@ function start(q){
 function stop(){running=false;unlockWake();startbtn.style.display="";pausebtn.style.display="none";
  prevbtn.style.display="none";nextbtn.style.display="none";
  if(rec){rec.onend=null;rec.stop();rec=null;}}
-function jump(d){if(!running)return;speechSynthesis.cancel();judging=false;
+function jump(d){if(!running)return;hush();judging=false;
  // Stepping forward off the last line is how a run ends, not a wall.
  pos=Math.max(0,Math.min(queue.length,pos+d));
  if(paused){paused=false;if(rec)try{rec.start();}catch(_){/**/}}
@@ -725,7 +777,7 @@ startbtn.onclick=()=>start(currentSet());
 // Changing the scene or mode mid-run: the queue was built at Start, so
 // the old run would keep playing ("stuck on whatever the line is").
 // Halt cleanly and hand back the pineapple, aimed at the new pick.
-function halt(){token++;speechSynthesis.cancel();judging=false;paused=false;
+function halt(){token++;hush();judging=false;paused=false;
  stop();stage.innerHTML="";whereEl.textContent="";
  my.textContent="\\u{1F34D} Press Start to run this selection.";}
 scope.onchange=()=>{if(running)halt();};
@@ -737,7 +789,7 @@ mode.onchange=()=>{if(running)halt();};
 // listening and reacting while "paused".
 function pause(){if(paused)return;paused=true;token++;judging=false;
  pausebtn.textContent="\\u25B6";pausebtn.title="resume";
- speechSynthesis.cancel();
+ hush();
  if(rec)try{rec.abort();}catch(_){/**/}
  my.textContent="Paused.";}
 function resume(){if(!paused)return;paused=false;autoPaused=false;
@@ -819,6 +871,7 @@ def main():
                 for g in speeches[prev + 1:i]:
                     if g["speaker"] and g["say"]:
                         gap.append({"s": g["speaker"], "t": g["say"],
+                                    "l": line_id(g["speaker"], g["say"]),
                                     "m": mood_of(g["text"]),
                                     "p": pace_of(g["text"]),
                                     "x": g["sfx"]})
@@ -826,6 +879,7 @@ def main():
                         gap.append({"s": "", "t": "", "m": NEUTRAL,
                                     "p": 1.3, "x": g["sfx"]})
                 lines.append({"i": i, "act": s["act"], "say": s["say"],
+                              "l": line_id(name, s["say"]),
                               "page": s.get("page", 0),
                               "cue": cue_for(speeches, i), "gap": gap})
                 prev = i

@@ -1,15 +1,17 @@
 """Assemble the folder that gets uploaded to Cloudflare Pages.
 
 Collects the freshly built character pages, adds a landing page for the
-cast, and adds the headers that keep a licensed script out of search
-engines. The whole folder is what you drag into Cloudflare's direct
-upload. Nothing here is the deployment itself: the account, the upload
+cast, the Voice Booth (records samples for Neil's Lab), the upload
+worker, any rendered real-voice clips, and the headers that keep a
+licensed script out of search engines. The whole folder is what gets
+deployed. Nothing here is the deployment itself: the account, the upload
 and the email gate stay in your hands, per DEPLOY.md alongside.
 
 Usage:
     python prep_deploy.py private/handouts private/deploy
 """
 
+import json
 import os
 import shutil
 import sys
@@ -62,6 +64,12 @@ INDEX = """<!DOCTYPE html>
  .dlabel span{display:block;font-size:.86rem;font-weight:600;color:#dfe6f7}
  .dlabel small{display:block;margin-top:.2rem;color:#55618a;font-size:.66rem;
    text-transform:uppercase;letter-spacing:.09em}
+ .micbox{width:44px;height:66px;flex:none;display:flex;align-items:center;
+   justify-content:center;border-radius:10px;
+   background:linear-gradient(180deg,#182446,#0c1428);border:1px solid #3a4a75;
+   box-shadow:0 8px 18px rgba(0,0,0,.6),0 0 12px rgba(255,183,71,.22)}
+ .micbox svg{width:24px;height:38px;
+   filter:drop-shadow(0 3px 5px rgba(0,0,0,.75)) drop-shadow(0 0 6px rgba(255,183,71,.5))}
  @media (max-width:720px){#cols{flex-direction:column}aside{width:100%;position:static;margin-top:1.2rem}}
 </style></head><body>
 <h1>&#127821; See How They Run — pick your character</h1>
@@ -84,9 +92,198 @@ __LINKS__
  <span class="dlabel"><b>French Scene Labeler</b><span>Assign Groups</span>
  <small>director's door &#8250;</small></span>
 </a>
+<a class="door-btn" href="voice_booth.html" style="margin-top:.8rem">
+ <span class="micbox"><svg viewBox="0 0 24 34" fill="none">
+  <rect x="8" y="2" width="8" height="14" rx="4" fill="#ffd75e"/>
+  <path d="M4.5 13a7.5 7.5 0 0 0 15 0" stroke="#ffd75e" stroke-width="2" stroke-linecap="round"/>
+  <line x1="12" y1="21" x2="12" y2="27" stroke="#ffd75e" stroke-width="2" stroke-linecap="round"/>
+  <line x1="7.5" y1="28.5" x2="16.5" y2="28.5" stroke="#ffd75e" stroke-width="2" stroke-linecap="round"/>
+ </svg></span>
+ <span class="dlabel"><b>Voice Booth</b><span>Record your voice so
+ others can use it</span>
+ <small>neil's lab &#8250;</small></span>
+</a>
 </aside>
 </div>
 </body></html>
+"""
+
+BOOTH = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Booth — Neil's Lab</title>
+<style>
+ body{font-family:"Segoe UI Variable Display","Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
+      font-weight:500;letter-spacing:.012em;max-width:640px;margin:2rem auto;
+      padding:0 1rem 5rem;background:#0a0f1e;color:#e8e6df;line-height:1.55}
+ h1{font-size:1.45rem;font-weight:800;letter-spacing:.03em;margin-bottom:.2rem;color:#ffd75e}
+ .muted{color:#7d87a3;font-size:.9rem;font-weight:400}
+ select,button{font-size:1rem;padding:.45rem .8rem;margin:.2rem .3rem .2rem 0;
+      border:1px solid #2b3a5e;border-radius:8px;background:#111a30;color:#e8e6df;cursor:pointer}
+ button:disabled{opacity:.4;cursor:default}
+ button.primary{background:#0d1526;color:#ffd75e;border:1px solid #ffd75e;
+      text-shadow:0 0 6px #ffb347,0 0 14px #ff9d1c;
+      box-shadow:0 0 8px rgba(255,183,71,.45),inset 0 0 8px rgba(255,183,71,.15)}
+ .card{margin:1.1rem 0;padding:1rem 1.1rem;border:1px solid #2b3a5e;border-radius:14px;
+      background:linear-gradient(160deg,#111a30,#0d1526);
+      box-shadow:0 8px 20px rgba(0,0,0,.5)}
+ .card h2{font-size:.95rem;color:#ffd75e;margin:0 0 .5rem;letter-spacing:.03em}
+ .card .prompt{font-size:1.05rem;color:#f2f0e9;margin:.4rem 0 .8rem}
+ .card .prompt i{color:#9aa4c0}
+ .recbtn{border-radius:999px}
+ .recbtn.on{border-color:#ff6b6b;color:#ff9d9d;box-shadow:0 0 10px rgba(255,80,80,.5)}
+ .state{font-size:.85rem;color:#7d87a3;min-height:1.2rem;margin-top:.3rem}
+ .state.good{color:#7fe0a7}
+ .state.warn{color:#ffb347}
+ #meter{height:6px;border-radius:3px;background:#111a30;border:1px solid #2b3a5e;
+      overflow:hidden;margin:.5rem 0 0;display:none}
+ #meter div{height:100%;width:0;background:linear-gradient(90deg,#7fe0a7,#ffd75e,#ff6b6b)}
+ #sendwrap{margin-top:1.6rem;text-align:center}
+ #sendmsg{margin-top:.6rem;font-size:.9rem;color:#9aa4c0;min-height:1.3rem}
+ .consent{margin-top:2rem;font-size:.78rem;color:#55618a;line-height:1.5}
+ #backbtn{position:fixed;bottom:1.2rem;left:1.2rem;font-size:.75rem;
+      color:#7d87a3;background:#0d1526;border:1px solid #2b3a5e;
+      border-radius:999px;padding:.35rem .8rem;text-decoration:none;
+      box-shadow:0 2px 8px rgba(0,0,0,.5)}
+ #backbtn:hover{border-color:#ffd75e;color:#e8e6df}
+</style></head><body>
+<h1>&#127908; Voice Booth <span class="muted">— Neil's Lab</span></h1>
+<div class="muted">Record your voice so others can use it. Three short
+takes, about two minutes all told. Use your <b>regular speaking
+voice</b> on the first two — the conversion copies your natural voice
+best, even if it flattens the theatrics. The third take is where the
+character comes out. None of it has to be perfect — this is a farce,
+funny will be funny.</div>
+<div style="margin:1.2rem 0 .2rem">Who are you?
+ <select id="who"><option value="">— pick your character —</option></select>
+</div>
+<div id="cards"></div>
+<div id="meter"><div></div></div>
+<div id="sendwrap">
+ <button class="primary" id="sendbtn" disabled>&#127821; Send to Neil's Lab</button>
+ <div id="sendmsg"></div>
+</div>
+<div class="consent">Your takes go only to Neil's Lab. They're used to
+build a practice voice that reads your lines inside this cast's pages —
+nothing else, nowhere else — and it's deleted if you ask.</div>
+<a id="backbtn" href="index.html">&#8592; Back to Cast List</a>
+<script>
+const CAST=__CAST__;
+const CARDS=[
+ {title:"1 · The paragraph (your everyday voice)",min:9,free:false,
+  text:"Right, here goes. This is my ordinary speaking voice, recorded "+
+   "for Neil's Lab. The old church clock struck nine while thick fog "+
+   "rolled over the village green, and somebody's bicycle bell jangled "+
+   "twice outside the vicarage gate. I judge a good cup of tea by three "+
+   "things: the pot, the pour, and the patience."},
+ {title:"2 · A question, then an order (mean both)",min:4,free:false,
+  text:"Who on earth put a penguin in the pantry? Well, don't just "+
+   "stand there -- go and fetch it out!"},
+ {title:"3 · A line of your own",min:2,free:true,
+  text:"One line of your character, from memory -- your favorite "+
+   "delivery, played the way you'd play it on stage."},
+];
+const whoSel=document.getElementById("who");
+CAST.forEach(c=>{const o=document.createElement("option");o.value=c;o.textContent=c;whoSel.appendChild(o);});
+
+const takes=CARDS.map(()=>null);   // {blob,type,dur,peak,clip}
+let stream=null,ac=null,an=null,mr=null,chunks=[],recIdx=-1,t0=0,peak=0,clipN=0,frameN=0,raf=0;
+const MT=["audio/webm;codecs=opus","audio/webm","audio/mp4"].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t))||"";
+const meter=document.getElementById("meter"),bar=meter.firstElementChild;
+
+const cardsEl=document.getElementById("cards");
+CARDS.forEach((c,i)=>{
+ const d=document.createElement("div");d.className="card";
+ d.innerHTML='<h2>'+c.title+'</h2><div class="prompt">'+
+  (c.free?'<i>'+c.text+'</i>':'&ldquo;'+c.text+'&rdquo;')+'</div>'+
+  '<button class="recbtn" data-i="'+i+'">&#9210; Record</button>'+
+  '<button class="playbtn" data-i="'+i+'" disabled>&#9654; Play</button>'+
+  '<div class="state" id="state'+i+'"></div>';
+ cardsEl.appendChild(d);
+});
+const state=(i,msg,cls)=>{const s=document.getElementById("state"+i);
+ s.textContent=msg;s.className="state"+(cls?" "+cls:"");};
+
+// Recording wants the actor's actual sound: turn the phone's own
+// processing off where the browser lets us.
+async function mic(){
+ if(stream)return stream;
+ stream=await navigator.mediaDevices.getUserMedia({audio:{
+  echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+ ac=new (window.AudioContext||window.webkitAudioContext)();
+ an=ac.createAnalyser();an.fftSize=2048;
+ ac.createMediaStreamSource(stream).connect(an);
+ return stream;
+}
+function watch(){
+ const buf=new Float32Array(an.fftSize);
+ const tick=()=>{
+  an.getFloatTimeDomainData(buf);
+  let p=0;for(let i=0;i<buf.length;i++){const v=Math.abs(buf[i]);if(v>p)p=v;}
+  peak=Math.max(peak,p);frameN++;if(p>.97)clipN++;
+  bar.style.width=Math.min(100,p*130)+"%";
+  raf=requestAnimationFrame(tick);
+ };tick();
+}
+async function startRec(i,btn){
+ try{await mic();}catch(_){state(i,"Mic blocked -- allow the microphone for this site and try again.","warn");return;}
+ if(ac.state==="suspended")ac.resume();
+ chunks=[];recIdx=i;t0=Date.now();peak=0;clipN=0;frameN=0;
+ mr=new MediaRecorder(stream,MT?{mimeType:MT}:undefined);
+ mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+ mr.onstop=()=>finishRec(i,btn);
+ mr.start();
+ btn.textContent="\\u23F9 Stop";btn.classList.add("on");
+ meter.style.display="block";watch();
+ state(i,"Recording\\u2026 take your time.");
+}
+function finishRec(i,btn){
+ cancelAnimationFrame(raf);meter.style.display="none";
+ btn.textContent="\\u23FA Record";btn.classList.remove("on");
+ const dur=(Date.now()-t0)/1000;
+ const blob=new Blob(chunks,{type:mr.mimeType||MT||"audio/webm"});
+ // The booth-side judgment: catch the takes no adjustment can save
+ // before they're ever sent. Everything softer than these gets fixed
+ // in Neil's Lab, not re-recorded.
+ if(dur<CARDS[i].min){state(i,"Too short -- have another go, no rush.","warn");return;}
+ if(peak<.06){state(i,"Barely heard you -- a bit closer to the phone, once more.","warn");return;}
+ takes[i]={blob,type:blob.type,dur:Math.round(dur)};
+ const rough=clipN/Math.max(1,frameN)>.05;
+ state(i,"\\u2713 Got it ("+Math.round(dur)+"s)."+(rough?" A touch loud/crackly -- fine to keep, or redo a step further back.":""),
+  rough?"warn":"good");
+ document.querySelector('.playbtn[data-i="'+i+'"]').disabled=false;
+ maybeArm();
+}
+document.addEventListener("click",e=>{
+ const b=e.target.closest("button");if(!b)return;
+ const i=+b.dataset.i;
+ if(b.classList.contains("recbtn")){
+  if(mr&&mr.state==="recording"){if(recIdx===i)mr.stop();return;}
+  startRec(i,b);
+ }
+ if(b.classList.contains("playbtn")&&takes[i]){
+  new Audio(URL.createObjectURL(takes[i].blob)).play();
+ }
+});
+const sendbtn=document.getElementById("sendbtn"),sendmsg=document.getElementById("sendmsg");
+function maybeArm(){sendbtn.disabled=!(whoSel.value&&takes.every(t=>t));}
+whoSel.onchange=maybeArm;
+sendbtn.onclick=async()=>{
+ sendbtn.disabled=true;
+ for(let i=0;i<takes.length;i++){
+  sendmsg.textContent="Sending take "+(i+1)+" of "+takes.length+"\\u2026";
+  try{
+   const r=await fetch("/api/voice-upload?who="+encodeURIComponent(whoSel.value)+"&card="+(i+1),
+    {method:"POST",headers:{"content-type":takes[i].type},body:takes[i].blob});
+   if(!r.ok)throw new Error(r.status);
+  }catch(_){
+   sendmsg.textContent="Take "+(i+1)+" didn't go through -- check the connection and press Send again.";
+   sendbtn.disabled=false;return;
+  }
+ }
+ sendmsg.innerHTML="&#127821; Sent to Neil's Lab. You're done -- thank you!";
+};
+</script></body></html>
 """
 
 # Keep the pages out of search indexes; this play is licensed material and
@@ -148,6 +345,21 @@ def main():
     fs = os.path.join(os.path.dirname(src), "french_scenes.html")
     if os.path.exists(fs):
         shutil.copy2(fs, os.path.join(dst, "french_scenes.html"))
+    # The Voice Booth, its upload worker, and any voices already rendered
+    # by Neil's Lab. Cast list comes from AVATARS so even the CHOIRBOY
+    # (no practice page, but his lines cue people) can leave a voice.
+    with open(os.path.join(dst, "voice_booth.html"), "w",
+              encoding="utf-8") as fh:
+        fh.write(BOOTH.replace("__CAST__", json.dumps(sorted(AVATARS))))
+    here = os.path.dirname(os.path.abspath(__file__))
+    shutil.copy2(os.path.join(here, "_worker.js"),
+                 os.path.join(dst, "_worker.js"))
+    voices = os.path.join(os.path.dirname(src), "voices")
+    if os.path.isdir(voices):
+        shutil.copytree(voices, os.path.join(dst, "voices"),
+                        dirs_exist_ok=True)
+        n = sum(len(fs) for _, _, fs in os.walk(voices))
+        print("real-voice clips: %d files" % n)
     with open(os.path.join(dst, "_headers"), "w", encoding="utf-8") as fh:
         fh.write(HEADERS)
     with open(os.path.join(dst, "robots.txt"), "w", encoding="utf-8") as fh:

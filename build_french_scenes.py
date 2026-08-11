@@ -87,7 +87,13 @@ TEMPLATE = """<!DOCTYPE html>
  #footer{display:flex;gap:.6rem;margin-top:1rem;position:sticky;bottom:0;
       background:#0a0f1e;padding:.6rem 0}
  #footer button{flex:1;font-size:1rem;padding:.55rem}
+ #backbtn{position:fixed;bottom:1.2rem;left:1.2rem;font-size:.75rem;
+      color:#7d87a3;background:#0d1526;border:1px solid #2b3a5e;
+      border-radius:999px;padding:.35rem .8rem;text-decoration:none;z-index:6;
+      box-shadow:0 2px 8px rgba(0,0,0,.5)}
+ #backbtn:hover{border-color:#ffd75e;color:#e8e6df}
 </style></head><body>
+<a id="backbtn" href="index.html">&#8592; Back to Cast List</a>
 <div id="top">
  <h1>&#127821; French scenes</h1>
  <select id="view"><option value="book">Whole script</option><option value="page">One page at a time</option></select>
@@ -319,24 +325,46 @@ function dl(name,blob){const a=document.createElement("a");
  a.href=URL.createObjectURL(blob);a.download=name;a.click();}
 function pdfSafe(s){return s.replace(/\\u2014/g,"--").replace(/\\u2026/g,"...")
  .replace(/\\u26A0/g,"!").replace(/\\u00b7/g,".").replace(/[^\\x20-\\x7E\\n]/g,"?");}
+// The PDF is typeset, not dumped: scene headers in bold amber, the
+// starts-after / opens-with / call labels in small gray italic, quoted
+// script text in Courier, call groups in bold. Quiet, but each kind of
+// line reads as itself at a glance.
 function pdf(text){
  const lines=pdfSafe(text).split("\\n");
- const perPage=52,chunks=[];
+ const perPage=44,chunks=[];
  for(let i=0;i<lines.length;i+=perPage)chunks.push(lines.slice(i,i+perPage));
  const e2=s=>s.replace(/\\\\/g,"\\\\\\\\").replace(/\\(/g,"\\\\(").replace(/\\)/g,"\\\\)");
+ function style(l,abs){
+  if(abs===0)return{lead:0,ops:"0.05 0.08 0.22 rg /FB 16 Tf ("+e2(l)+") Tj "};
+  if(/^-+$/.test(l))return{lead:9,ops:"0.8 0.8 0.8 rg /FC 9 Tf ("+e2(l)+") Tj "};
+  if(/^SCENE \\d|^THE PLAN/.test(l))
+   return{lead:22,ops:"0.72 0.47 0 rg /FB 12 Tf ("+e2(l)+") Tj "};
+  const m=l.match(/^  (starts after|opens with|call:)\\s*(.*)$/);
+  if(m)return{lead:13,ops:"0.45 0.45 0.45 rg /FI 9 Tf (    "+e2(m[1])+"  ) Tj "
+   +"0 0 0 rg /FC 10 Tf ("+e2(m[2])+") Tj "};
+  if(!l.trim())return{lead:8,ops:""};
+  if(/^\\S/.test(l))return{lead:16,ops:"0.05 0.08 0.22 rg /FB 11 Tf ("+e2(l)+") Tj "};
+  return{lead:13,ops:"0 0 0 rg /FC 10 Tf ("+e2(l)+") Tj "};
+ }
  const objs=[];const add=s=>{objs.push(s);return objs.length;};
- const fontId=add("<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>");
+ const fontIds={};
+ for(const[k,f]of[["FC","Courier"],["FB","Helvetica-Bold"],["FI","Helvetica-Oblique"]])
+  fontIds[k]=add("<< /Type /Font /Subtype /Type1 /BaseFont /"+f+" >>");
  const pageIds=[],contentIds=[];
- chunks.forEach(ch=>{
-  let st="BT /F1 11 Tf 13 TL 50 742 Td\\n";
-  ch.forEach(l=>{st+="("+e2(l)+") Tj T*\\n";});
+ chunks.forEach((ch,pi)=>{
+  let st="BT 54 742 Td\\n";
+  ch.forEach((l,li)=>{
+   const s=style(l,pi*perPage+li);
+   st+=(li?s.lead+" TL T* ":"")+s.ops+"\\n";
+  });
   st+="ET";
   contentIds.push(add("<< /Length "+st.length+" >>\\nstream\\n"+st+"\\nendstream"));
  });
  const pagesId=objs.length+chunks.length+1;
+ const fontRes="/Font << "+Object.entries(fontIds).map(([k,i])=>"/"+k+" "+i+" 0 R").join(" ")+" >>";
  chunks.forEach((_,k)=>{
   pageIds.push(add("<< /Type /Page /Parent "+pagesId+" 0 R /MediaBox [0 0 612 792]"+
-   " /Resources << /Font << /F1 "+fontId+" 0 R >> >> /Contents "+contentIds[k]+" 0 R >>"));
+   " /Resources << "+fontRes+" >> /Contents "+contentIds[k]+" 0 R >>"));
  });
  add("<< /Type /Pages /Kids ["+pageIds.map(i=>i+" 0 R").join(" ")+"] /Count "+pageIds.length+" >>");
  const catId=add("<< /Type /Catalog /Pages "+pagesId+" 0 R >>");

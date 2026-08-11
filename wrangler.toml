@@ -1,0 +1,13 @@
+# Cloudflare Pages config for the dramadex project. `wrangler pages
+# deploy` reads this: it knows the output folder and attaches the KV
+# store the Voice Booth uploads into (binding VOICES, used by
+# _worker.js). deploy.cmd is the normal way to ship.
+# (KV, not R2: R2 is not enabled on the account. If it ever is, the
+# swap is the three storage calls in _worker.js plus this binding.)
+name = "dramadex"
+compatibility_date = "2026-08-01"
+pages_build_output_dir = "private/deploy"
+
+[[kv_namespaces]]
+binding = "VOICES"
+id = "4010bf487cc84687b177dbd0a7ea9c8a"
