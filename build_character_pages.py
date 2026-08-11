@@ -185,7 +185,10 @@ SFX_RE = [
     ("doorbell", re.compile(r"DOORBELL|DOOR-BELL|front door bell", re.I)),
     ("phone", re.compile(r"TELEPHONE rings|'phone rings|PHONE-BELL", re.I)),
     ("crash", re.compile(r"CRASH", re.I)),
-    ("church", re.compile(r"church BELLS|BELLS tops|clanging of church", re.I)),
+    # Case-sensitive on purpose: the printed cue is "church BELLS" in a
+    # direction. Penelope ASKS about the bells in lowercase dialogue
+    # ("Did you hear the church bells?"), and that must not ring them.
+    ("church", re.compile(r"church BELLS|BELLS tops|clanging of church")),
     ("slam", re.compile(r"slams the door|door[- ]slam", re.I)),
     ("bump", re.compile(r"bumping noise|bumps in|loud HAMMERING|KNOCK from",
                         re.I)),
