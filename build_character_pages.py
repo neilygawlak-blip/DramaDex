@@ -325,6 +325,14 @@ TEMPLATE = """<!DOCTYPE html>
  .star{cursor:pointer;border:none;background:none;font-size:1.1rem}
  #mystate{font-size:.85rem;color:#7d87a3}
  .listening{color:#7fe0a7;font-weight:bold}
+ #againbtn{border:none;background:none;cursor:pointer;color:#ffd75e;
+      font-size:.8rem;display:inline-flex;align-items:center;gap:.35rem;
+      margin-left:.6rem;vertical-align:middle;padding:0}
+ #againbtn svg{width:1.5rem;height:1.5rem;transform:rotate(-90deg)}
+ #againbtn .rbg{fill:none;stroke:#2b3a5e;stroke-width:3}
+ #againbtn .rfg{fill:none;stroke:#ffd75e;stroke-width:3;
+      stroke-dasharray:63;stroke-dashoffset:0;animation:ring 1s linear forwards}
+ @keyframes ring{to{stroke-dashoffset:63}}
  #backbtn{position:fixed;bottom:1.2rem;left:1.2rem;font-size:.75rem;
       color:#7d87a3;background:#0d1526;border:1px solid #2b3a5e;
       border-radius:999px;padding:.35rem .8rem;text-decoration:none;
@@ -601,14 +609,23 @@ function step(){
 
 function judged(l,text){
  judging=false;const g=grade(l.say,text);
- document.getElementById("verdict").textContent=g.tier;
+ const v=document.getElementById("verdict");
+ v.textContent=g.tier;
  // Only the words they landed light up. A missed word stays a blank
  // slot rather than a red spoiler: hints are given when asked for,
  // never as a punishment.
  lightUp(text);
  my.textContent="";
  const t=token;
- setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},g.r>=.65?900:2000);
+ // After any completion: a one-second ring, then straight on. Tapping
+ // the ring ("Again") replays this line instead.
+ const b=document.createElement("button");b.id="againbtn";
+ b.innerHTML='<svg viewBox="0 0 24 24"><circle class="rbg" cx="12" cy="12" r="10"/>'+
+  '<circle class="rfg" cx="12" cy="12" r="10"/></svg>Again';
+ v.appendChild(b);
+ const go=setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},1000);
+ b.onclick=()=>{clearTimeout(go);
+  if(t===token&&running&&!paused){token++;setTimeout(step,100);}};
 }
 
 function lev(a,b){if(a===b)return 0;let p=[...Array(b.length+1).keys()];
