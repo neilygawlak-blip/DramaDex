@@ -997,6 +997,9 @@ READ_TEMPLATE = """<!DOCTYPE html>
 <div class="muted">The whole play, performed aloud. Press play, or tap
 any line to start from there.</div>
 <select id="scope"></select>
+<select id="spd"><option value="0.5">Half speed</option>
+<option value="1" selected>Normal speed</option>
+<option value="1.35">Faster</option><option value="1.7">Fastest</option></select>
 <label id="voxwrap"><input type="checkbox" id="voxchk"> &#127908; Real voices</label>
 <button class="primary" id="startbtn">&#127821; Play</button>
 </div>
@@ -1018,6 +1021,12 @@ fetch("voices/manifest.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).the
   voxchk.checked=localStorage.getItem("vox")==="on";}
 }).catch(()=>{});
 voxchk.onchange=()=>localStorage.setItem("vox",voxchk.checked?"on":"off");
+// Listener-chosen speed. Applies to robot voices, real clips (pitch
+// preserved) and effect waits alike; changes take hold on the next line.
+const spdSel=document.getElementById("spd");
+let SPD=+(localStorage.getItem("rtspd")||1)||1;
+if([...spdSel.options].some(o=>+o.value===SPD))spdSel.value=String(SPD);else SPD=1;
+spdSel.onchange=()=>{SPD=+spdSel.value;localStorage.setItem("rtspd",spdSel.value);};
 let liveClips=new Set();
 function hush(){speechSynthesis.cancel();
  liveClips.forEach(a=>{a.onended=null;a.onerror=null;a.pause();});
@@ -1068,7 +1077,7 @@ const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)
 function ttsSpeak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynthesisUtterance(t);
  const p=(DATA.voices&&DATA.voices[who])||{g:"m",style:"casual",mult:1};
  const v=pickVoice(p,who);if(v)u.voice=v;
- let r=(pace||1.3)*(p.mult||1);
+ let r=(pace||1.3)*(p.mult||1)*SPD;
  if(IOS)r=1+(r-1)*.3;
  u.rate=r;
  u.pitch=(v&&rank(v)===0)?1:(p.g==="f"?1.1:.85);
@@ -1082,6 +1091,9 @@ function speak(t,pace,who,done,lid){
  if(lid&&who&&voxchk.checked&&VOX.has(who+"/"+lid)){
   const a=new Audio("voices/"+who.replace(/ /g,"_")+"/"+lid+".mp3");
   liveClips.add(a);
+  // Listener-chosen speed is not the farce nudge: an explicit choice
+  // applies to real voices too, pitch preserved.
+  a.playbackRate=SPD;a.preservesPitch=true;
   let fin=false;
   const ok=()=>{if(!fin){fin=true;liveClips.delete(a);done();}};
   const bad=()=>{if(!fin){fin=true;liveClips.delete(a);ttsSpeak(t,pace,who,done);}};
@@ -1140,7 +1152,7 @@ function step(){
  const t=++token,it=DATA.items[idx];
  mark(idx);
  if(!it.t){const w=playSfx(it.x);
-  setTimeout(()=>{if(t===token&&running&&!paused){idx++;step();}},w+200);return;}
+  setTimeout(()=>{if(t===token&&running&&!paused){idx++;step();}},(w+200)/SPD);return;}
  const w=playSfx(it.x);
  setTimeout(()=>{if(t!==token||!running||paused)return;
   // Together partners sound at the same moment. A partner with a real
@@ -1152,7 +1164,7 @@ function step(){
     speak(p.t,p.p,p.s,()=>{},p.l);
   });
   speak(it.t,it.p,it.s,()=>{if(t===token&&running&&!paused){idx++;
-   setTimeout(step,120);}},it.l);},w);
+   setTimeout(step,120);}},it.l);},w/SPD);
 }
 // The top-bar button is the read-through's transport: Play, then Pause,
 // then Resume, always visible in the sticky bar. The floating corner
