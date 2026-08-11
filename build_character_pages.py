@@ -350,7 +350,15 @@ TEMPLATE = """<!DOCTYPE html>
       padding:.06rem .55rem;border:1px solid #3a4a75;border-radius:999px;
       background:#131d38;box-shadow:0 2px 8px rgba(0,0,0,.55),
       0 0 6px rgba(255,183,71,.12)}
- #verdict{font-size:2.2rem;margin:.5rem 0}
+ #verdict{font-size:2.2rem;margin:.5rem 0;min-height:2.6rem}
+ #verdict svg{width:2.6rem;height:2.6rem;vertical-align:middle}
+ #verdict .ccirc{stroke:#7fe0a7;stroke-width:2.5;fill:none;opacity:.45;
+      stroke-dasharray:151;stroke-dashoffset:151;animation:cdraw .45s ease-out forwards}
+ #verdict .cmark{stroke:#7fe0a7;stroke-width:4;stroke-linecap:round;
+      stroke-linejoin:round;fill:none;stroke-dasharray:36;stroke-dashoffset:36;
+      animation:cdraw .35s .22s ease-out forwards;
+      filter:drop-shadow(0 0 6px rgba(127,224,167,.7))}
+ @keyframes cdraw{to{stroke-dashoffset:0}}
  #diff span.ok{color:#7fe0a7}
  #diff span.pending{color:transparent;border-bottom:1px dotted #3a4a75}
  #diff span.pending.lit{color:#7fe0a7;border-bottom:none}
@@ -396,7 +404,8 @@ TEMPLATE = """<!DOCTYPE html>
       border-radius:999px;padding:.3rem .7rem;text-decoration:none;
       box-shadow:0 2px 8px rgba(0,0,0,.5)}
  #reportbtn:hover{border-color:#ffd75e;color:#e8e6df}
- #build{margin-top:2.2rem;font-size:.68rem;color:#39415e;text-align:center}
+ #build{position:fixed;bottom:.3rem;left:0;right:0;text-align:center;
+      font-size:.58rem;color:#20294a;pointer-events:none}
 </style></head><body>
 <h1>__AVATAR__ __NAME__ <span class="muted">— See How They Run</span></h1>
 <div class="muted">__COUNT__ lines. Pick a scene, press the pineapple, and
@@ -411,8 +420,9 @@ just speak when it's your turn.</div>
  <label id="voxwrap" style="display:none;font-size:.85rem;color:#9aa4c0">
   <input type="checkbox" id="voxchk" checked> &#127908; Real voices</label>
  <button class="primary" id="startbtn">&#127821; Start</button>
- <button id="prevbtn" style="display:none" title="previous line (left arrow)">&#9664;</button>
- <button id="nextbtn" style="display:none" title="next line (right arrow)">&#9654;</button>
+ <span style="white-space:nowrap"><button id="prevbtn" style="display:none"
+  title="previous line (left arrow)">&#9664;</button>
+ <button id="nextbtn" style="display:none" title="next line (right arrow)">&#9654;</button></span>
  <button id="pausebtn" style="display:none" title="pause">&#9208;</button>
 </div>
 <div id="mystate"></div>
@@ -555,8 +565,8 @@ function grade(expected,heard){
  const r=E.length?hit/E.length:1;
  // One tier or silence, by Chris's call: the unlit words already say
  // exactly what was missed, and a verdict under that is just noise.
- // Nailed it is the only thing worth announcing.
- return {tier:r>=.9?"\\u{1F3AF} Nailed it":"",marks,r};
+ // A landed line gets the drawn green check, nothing else.
+ return {nailed:r>=.9,marks,r};
 }
 
 // ---- the run loop ----
@@ -637,21 +647,22 @@ function show(l,auto){
  // Together lines: every partner's text loads in alongside the line,
  // and the reveal sweeps all of them at the same calm pace once the
  // moment starts (startSim sets the clocks running).
+ // Expression faces are gone from the display for now (the mood data
+ // still ships in DATA for the better version later).
  const simRows=(l.sim||[]).map(p=>{
   const pav=DATA.avatars&&DATA.avatars[p.s]||"";
-  return '<div class="simline"><span style="font-size:1.2rem">'+(p.m||"\\u{1F642}")+
-   '</span> <span class="cuename">'+pav+" "+p.s+'.</span> '+
+  return '<div class="simline"><span class="cuename">'+pav+" "+p.s+'.</span> '+
    '<span class="fillwrap"><span class="fillghost">'+esc(p.t)+'</span>'+
    '<span class="filltext">'+esc(p.t)+'</span></span></div>';}).join("");
- stage.innerHTML='<div class="cue"><span style="font-size:1.6rem">'+(c.mood||"\\u{1F642}")+'</span> '+
+ stage.innerHTML='<div class="cue">'+
   (c.sfx?"\\u{1F514} ":"")+
   (c.speaker?'<span class="cuename">'+av+" "+c.speaker+'.</span> ':"")+esc(c.say)+
   '<button id="ctxbtn">Full Script</button></div>'+
   '<div id="ctx"></div>'+
-  '<div id="verdict"></div>'+
   '<div class="mine"><span class="cuename">'+myAv+" "+NAME+'.</span> <span id="diff">'+mine+'</span>'+
   (l.sim?'<span class="simchip">\\u{1F5E3} Speak along with them</span>':"")+'</div>'+
   simRows+
+  '<div id="verdict"></div>'+
   (auto?"":'<div id="hints"><button id="wordbtn">Next Word</button> <button id="linebtn">Line</button> <button id="gotbtn">\\u2713 Got it</button></div>');
  const cb=document.getElementById("ctxbtn");
  // Full Script: the whole selected run, everyone's lines in order, with
@@ -720,7 +731,7 @@ function myTurn(l,t,auto){
 }
 function showGap(g){
  const av=g.s&&DATA.avatars&&DATA.avatars[g.s]||"";
- stage.innerHTML='<div class="cue"><span style="font-size:1.6rem">'+(g.m||"\\u{1F642}")+'</span> '+
+ stage.innerHTML='<div class="cue">'+
   (g.x?"\\u{1F514} ":"")+
   (g.s?'<span class="cuename">'+av+" "+g.s+'.</span> ':"")+esc(g.t)+'</div>';
 }
@@ -763,7 +774,9 @@ function step(){
 function judged(l,text){
  judging=false;const g=grade(l.say,text);
  const v=document.getElementById("verdict");
- v.textContent=g.tier;
+ v.innerHTML=g.nailed?'<svg viewBox="0 0 52 52">'+
+  '<circle class="ccirc" cx="26" cy="26" r="24"/>'+
+  '<path class="cmark" d="M15 27l8 8 15-16"/></svg>':"";
  // Only the words they landed light up. A missed word stays a blank
  // slot rather than a red spoiler: hints are given when asked for,
  // never as a punishment.
@@ -954,7 +967,8 @@ READ_TEMPLATE = """<!DOCTYPE html>
       border-radius:999px;padding:.35rem .8rem;text-decoration:none;z-index:6;
       box-shadow:0 2px 8px rgba(0,0,0,.5)}
  #backbtn:hover{border-color:#ffd75e;color:#e8e6df}
- #build{margin-top:2.2rem;font-size:.68rem;color:#39415e;text-align:center}
+ #build{position:fixed;bottom:.3rem;left:0;right:0;text-align:center;
+      font-size:.58rem;color:#20294a;pointer-events:none}
 </style></head><body>
 <div id="top">
 <h1>&#127911; Full Read Through <span class="muted">— See How They Run</span></h1>
