@@ -997,7 +997,8 @@ READ_TEMPLATE = """<!DOCTYPE html>
 <div class="muted">The whole play, performed aloud. Press play, or tap
 any line to start from there.</div>
 <select id="scope"></select>
-<select id="spd"><option value="0.5">Half speed</option>
+<select id="spd"><option value="0.5">50% Speed</option>
+<option value="0.75">75% Speed</option>
 <option value="1" selected>Normal speed</option>
 <option value="1.35">Faster</option><option value="1.7">Fastest</option></select>
 <label id="voxwrap"><input type="checkbox" id="voxchk"> &#127908; Real voices</label>
@@ -1080,12 +1081,10 @@ const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)
 function ttsSpeak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynthesisUtterance(t);
  const p=(DATA.voices&&DATA.voices[who])||{g:"m",style:"casual",mult:1};
  const v=pickVoice(p,who);if(v)u.voice=v;
- let r=(pace||1.3)*(p.mult||1);
- if(IOS)r=1+(r-1)*.3;
- // The listener's speed multiplies AFTER the iOS squeeze: the squeeze
- // corrects the platform's fast reading, but a chosen Half or Fastest
- // must actually mean it on every device.
- r*=SPD;
+ // Same multiplicatives on every device, iOS included (Chris's call):
+ // the listener picked a number and the number is what they get. The
+ // practice pages keep their iOS squeeze; this page has a speed knob.
+ let r=(pace||1.3)*(p.mult||1)*SPD;
  u.rate=r;
  u.pitch=(v&&rank(v)===0)?1:(p.g==="f"?1.1:.85);
  let fin=false;const fin1=()=>{if(!fin){fin=true;clearTimeout(guard);done();}};
