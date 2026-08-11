@@ -559,7 +559,12 @@ function grade(expected,heard){
 const stage=document.getElementById("stage"),my=document.getElementById("mystate");
 const startbtn=document.getElementById("startbtn"),pausebtn=document.getElementById("pausebtn");
 const prevbtn=document.getElementById("prevbtn"),nextbtn=document.getElementById("nextbtn");
-let queue=[],pos=0,running=false,paused=false,judging=false,heard="",rec=null,revealed=false;
+// Chrome quietly ends and restarts recognition sessions after pauses,
+// and each new session starts with an empty transcript. The words
+// already said must survive that: heardBase accumulates finished
+// sessions, sessText is the live one, heard is always their sum.
+let queue=[],pos=0,running=false,paused=false,judging=false,heard="",
+    heardBase="",sessText="",rec=null,revealed=false;
 
 // ---- pick a system voice per character: gender, then accent preference ----
 const FEM=/female|zira|hazel|susan|heather|catherine|linda|samantha|karen|serena|kate|fiona|moira|tessa|libby|sonia|aria|jenny|michelle/i;
@@ -736,7 +741,7 @@ function step(){
   stage.innerHTML='<div id="verdict">\\u{1F389}</div><div class="mine">'+what+'</div>';
   whereEl.textContent="";my.textContent="";stop();return;}
  const t=++token;
- const l=DATA.lines[queue[pos]];heard="";
+ const l=DATA.lines[queue[pos]];heard="";heardBase="";sessText="";
  setWhere(l);
  if(mode.value==="drill"){
   show(l,false);
@@ -899,14 +904,19 @@ function initMic(){
  // The mic runs through the cue playback too, and it hears the phone's
  // own speaker: with real cast voices the recognizer transcribes the cue
  // almost perfectly, and those words then lit up green in the actor's
- // line before they said a thing. While not judging, keep sliding the
- // baseline past everything heard; a line is judged only on what arrives
- // after its own window opens.
- let skipResults=0;
- rec.onstart=()=>{skipResults=0;};
+ // line before they said a thing. While not judging, keep sliding a
+ // CHARACTER offset past everything heard; a line is judged on exactly
+ // what the transcript grows by after its window opens. (An offset, not
+ // a result index: the actor's first words often extend a result that
+ // was still open when the cue ended, and skipping whole results
+ // swallowed them.)
+ let baseLen=0;
+ rec.onstart=()=>{baseLen=0;sessText="";};
  rec.onresult=e=>{
-  if(!judging){skipResults=e.results.length;return;}
-  heard="";for(let i=skipResults;i<e.results.length;i++)heard+=e.results[i][0].transcript+" ";
+  let full="";for(let i=0;i<e.results.length;i++)full+=e.results[i][0].transcript+" ";
+  if(!judging){baseLen=full.length;return;}
+  sessText=full.slice(baseLen);
+  heard=heardBase+sessText;
   lightUp(heard);
   const l=DATA.lines[queue[pos]];
   if(doneEnough(l)){try{rec.abort();}catch(_){/**/}judged(l,heard);setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);}
@@ -914,7 +924,8 @@ function initMic(){
  rec.onerror=e=>{if(e.error==="not-allowed"||e.error==="service-not-allowed"||e.error==="audio-capture"){
   if(rec){rec.onend=null;try{rec.abort();}catch(_){/**/}}rec=null;
   if(judging)my.textContent="No mic here: say it out loud anyway, then \\u25B6";}};
- rec.onend=()=>{if(running&&!paused&&rec)try{rec.start();}catch(_){/**/}};
+ rec.onend=()=>{heardBase+=sessText;sessText="";
+  if(running&&!paused&&rec)try{rec.start();}catch(_){/**/}};
  try{rec.start();}catch(_){rec=null;}
 }
 </script></body></html>
