@@ -125,12 +125,17 @@ AVATARS = {
     "MISS SKILLON": "\U0001F452\U0001F6B2",   # felt hat, the famous bicycle
     "PENELOPE":     "\U0001F3AD\U0001F456",   # actress in the scandalous slacks
     "LIONEL":       "✝\U0001FA73",       # the vicar, reduced to his shorts
-    "CLIVE":        "\U0001FA96✝",       # airman in a borrowed dog collar
+    # Military medal, not the helmet: U+1FA96 is a 2020 emoji Windows 10
+    # never received, and Clive rendered as a tofu square on it.
+    "CLIVE":        "\U0001F396️✝",  # decorated airman, borrowed dog collar
     "BISHOP":       "✝\U0001F458",       # bishop in pyjamas and robe
     "HUMPHREY":     "✝\U0001F9E3",       # the mild one with the muffler
     "MAN":          "\U0001F17F️\U0001F52B",  # dungarees marked P, revolver
     "SERGEANT":     "\U0001F46E\U0001F4D3",   # copper with his notebook
     "CHOIRBOY":     "\U0001F466\U0001F3B6",   # Willie, heard singing off
+    # Not a person: the eleventh "cast member" is the whole play,
+    # performed start to finish for listening along.
+    "FULL READ THROUGH": "\U0001F3A7\U0001F4D6",
 }
 
 # Who sounds like what, per Chris's casting. "proper" prefers a British
@@ -911,6 +916,254 @@ function initMic(){
 """
 
 
+READ_TEMPLATE = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Full Read Through — See How They Run</title>
+<style>
+ body{font-family:"Segoe UI Variable Display","Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
+      font-weight:500;letter-spacing:.012em;max-width:640px;margin:0 auto;
+      padding:0 1rem 5rem;background:#0a0f1e;color:#e8e6df;line-height:1.55}
+ #top{position:sticky;top:0;background:#0a0f1e;padding:1rem 0 .6rem;z-index:5;
+      border-bottom:1px solid #1a2440}
+ h1{font-size:1.3rem;font-weight:800;letter-spacing:.03em;margin:0 0 .2rem;color:#ffd75e}
+ .muted{color:#7d87a3;font-size:.85rem;font-weight:400}
+ select,button{font-size:1rem;padding:.45rem .8rem;margin:.4rem .3rem 0 0;
+      border:1px solid #2b3a5e;border-radius:8px;background:#111a30;color:#e8e6df;cursor:pointer}
+ button.primary{background:#0d1526;color:#ffd75e;border:1px solid #ffd75e;
+      text-shadow:0 0 6px #ffb347,0 0 14px #ff9d1c;
+      box-shadow:0 0 8px rgba(255,183,71,.45),inset 0 0 8px rgba(255,183,71,.15)}
+ #voxwrap{display:none;font-size:.85rem;color:#9aa4c0}
+ .acthead{color:#ffd75e;font-weight:700;margin:1.2rem 0 .3rem;letter-spacing:.05em}
+ .row{padding:.28rem .5rem;border-radius:8px;cursor:pointer;font-size:.98rem}
+ .row:hover{background:#111a30}
+ .row .nm{font-variant:small-caps;font-weight:700;color:#c9d2ea;margin-right:.35rem}
+ .row.now{background:#131d38;outline:1px solid #ffd75e}
+ .row.sfx{color:#7d87a3;font-style:italic}
+ #pausebtn{position:fixed;bottom:1.2rem;right:1.2rem;width:3.1rem;height:3.1rem;
+      border-radius:50%;font-size:1.15rem;line-height:1;padding:0;display:none;
+      background:#0d1526;border:1px solid #3a4a75;color:#ffd75e;
+      box-shadow:0 2px 10px rgba(0,0,0,.6),0 0 8px rgba(255,183,71,.2)}
+ #backbtn{position:fixed;bottom:1.2rem;left:1.2rem;font-size:.75rem;
+      color:#7d87a3;background:#0d1526;border:1px solid #2b3a5e;
+      border-radius:999px;padding:.35rem .8rem;text-decoration:none;z-index:6;
+      box-shadow:0 2px 8px rgba(0,0,0,.5)}
+ #backbtn:hover{border-color:#ffd75e;color:#e8e6df}
+ #build{margin-top:2.2rem;font-size:.68rem;color:#39415e;text-align:center}
+</style></head><body>
+<div id="top">
+<h1>&#127911; Full Read Through <span class="muted">— See How They Run</span></h1>
+<div class="muted">The whole play, performed aloud. Press play, or tap
+any line to start from there.</div>
+<select id="scope"></select>
+<label id="voxwrap"><input type="checkbox" id="voxchk"> &#127908; Real voices</label>
+<button class="primary" id="startbtn">&#127821; Play</button>
+</div>
+<div id="script"></div>
+<a id="backbtn" href="index.html">&#8592; Back to Cast List</a>
+<button id="pausebtn" title="pause">&#9208;</button>
+<div id="build">build __BUILD__</div>
+<script>
+const DATA=__DATA__;
+const esc=s=>s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+// ---- real cast voices (same manifest as the practice pages) ----
+let VOX=new Set();
+const voxchk=document.getElementById("voxchk");
+fetch("voices/manifest.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(m=>{
+ if(!m)return;
+ for(const[c,ids]of Object.entries(m))ids.forEach(id=>VOX.add(c+"/"+id));
+ if(VOX.size){document.getElementById("voxwrap").style.display="";
+  voxchk.checked=localStorage.getItem("vox")==="on";}
+}).catch(()=>{});
+voxchk.onchange=()=>localStorage.setItem("vox",voxchk.checked?"on":"off");
+let liveClips=new Set();
+function hush(){speechSynthesis.cancel();
+ liveClips.forEach(a=>{a.onended=null;a.onerror=null;a.pause();});
+ liveClips.clear();}
+
+// ---- synthesized sound effects (same as the practice pages) ----
+let AC=null;
+function tone(f,t0,d,type,gain){const o=AC.createOscillator(),g=AC.createGain();
+ o.type=type||"sine";o.frequency.value=f;g.gain.setValueAtTime(gain||.25,AC.currentTime+t0);
+ g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+t0+d);
+ o.connect(g).connect(AC.destination);o.start(AC.currentTime+t0);o.stop(AC.currentTime+t0+d);}
+function noise(t0,d){const b=AC.createBuffer(1,AC.sampleRate*d,AC.sampleRate),ch=b.getChannelData(0);
+ for(let i=0;i<ch.length;i++)ch[i]=(Math.random()*2-1)*Math.pow(1-i/ch.length,2);
+ const s=AC.createBufferSource(),g=AC.createGain();g.gain.value=.4;s.buffer=b;
+ s.connect(g).connect(AC.destination);s.start(AC.currentTime+t0);}
+const SFX={
+ doorbell(){tone(659,0,.4,"sine");tone(523,.35,.6,"sine");},
+ bell(){for(let i=0;i<4;i++)tone(880,i*.15,.12,"square",.12);},
+ phone(){for(let r=0;r<2;r++)for(let i=0;i<10;i++)tone(1000+(i%2)*180,r*1.1+i*.05,.05,"square",.1);},
+ crash(){noise(0,.7);tone(180,0,.4,"sawtooth",.15);},
+ church(){[392,330,294,262].forEach((f,i)=>tone(f,i*.7,1.6,"sine",.3));},
+ slam(){noise(0,.18);tone(70,0,.25,"sine",.5);},
+ bump(){[0,.4,.8].forEach(t=>{noise(t,.1);tone(90,t,.15,"sine",.4);});},
+};
+function playSfx(n){if(!n)return 0;if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();SFX[n]();
+ return n==="church"?3000:n==="phone"?2300:n==="slam"?500:n==="bump"?1300:1200;}
+
+// ---- voices (same picker as the practice pages) ----
+const FEM=/female|zira|hazel|susan|heather|catherine|linda|samantha|karen|serena|kate|fiona|moira|tessa|libby|sonia|aria|jenny|michelle/i;
+const MASC=/male|david|mark|george|richard|james|ryan|daniel|alex|fred|oliver|thomas|guy|william|sean/i;
+const rank=v=>/natural|neural/i.test(v.name)?0:/google/i.test(v.name)?1:2;
+function pickVoice(p,who){
+ const vs=speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en"));
+ if(!vs.length)return null;
+ const gender=v=>FEM.test(v.name)?"f":MASC.test(v.name)?"m":"?";
+ let pool=vs.filter(v=>gender(v)===p.g);
+ if(!pool.length)pool=vs;
+ const wantGB=p.style==="proper";
+ const accent=pool.filter(v=>wantGB?v.lang.includes("GB"):v.lang.includes("US"));
+ pool=accent.length?accent:pool;
+ pool.sort((a,b)=>rank(a)-rank(b));
+ const best=pool.filter(v=>rank(v)===rank(pool[0]));
+ let h=0;for(const ch of (who||""))h=(h*31+ch.charCodeAt(0))>>>0;
+ return best[h%best.length];
+}
+const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)
+ ||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+function ttsSpeak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynthesisUtterance(t);
+ const p=(DATA.voices&&DATA.voices[who])||{g:"m",style:"casual",mult:1};
+ const v=pickVoice(p,who);if(v)u.voice=v;
+ let r=(pace||1.3)*(p.mult||1);
+ if(IOS)r=1+(r-1)*.3;
+ u.rate=r;
+ u.pitch=(v&&rank(v)===0)?1:(p.g==="f"?1.1:.85);
+ let fin=false;const fin1=()=>{if(!fin){fin=true;clearTimeout(guard);done();}};
+ u.onend=fin1;u.onerror=fin1;
+ const est=1200+t.split(" ").length*430/u.rate;
+ const guard=setTimeout(fin1,est+2500);
+ speechSynthesis.speak(u);}
+function speak(t,pace,who,done,lid){
+ if(!t){done();return;}
+ if(lid&&who&&voxchk.checked&&VOX.has(who+"/"+lid)){
+  const a=new Audio("voices/"+who.replace(/ /g,"_")+"/"+lid+".mp3");
+  liveClips.add(a);
+  let fin=false;
+  const ok=()=>{if(!fin){fin=true;liveClips.delete(a);done();}};
+  const bad=()=>{if(!fin){fin=true;liveClips.delete(a);ttsSpeak(t,pace,who,done);}};
+  a.onended=ok;a.onerror=bad;
+  a.play().catch(bad);
+  return;
+ }
+ ttsSpeak(t,pace,who,done);
+}
+
+// ---- the reading ----
+const scriptEl=document.getElementById("script");
+const scope=document.getElementById("scope");
+const startbtn=document.getElementById("startbtn"),pausebtn=document.getElementById("pausebtn");
+let idx=0,endAt=0,running=false,paused=false,token=0,pickedFrom=null;
+function render(){
+ let h="",act="";
+ DATA.items.forEach((it,i)=>{
+  if(it.act&&it.act!==act){act=it.act;h+='<div class="acthead">'+act+"</div>";}
+  if(!it.t){h+='<div class="row sfx" data-i="'+i+'">\\u{1F514} (sound: '+it.x+')</div>';return;}
+  const av=DATA.avatars&&DATA.avatars[it.s]||"";
+  h+='<div class="row" data-i="'+i+'"><span class="nm">'+av+" "+it.s+'.</span>'+esc(it.t)+"</div>";
+ });
+ scriptEl.innerHTML=h;
+}
+render();
+function buildScope(){
+ const add=(v,t)=>{const o=document.createElement("option");o.value=v;o.textContent=t;scope.appendChild(o);};
+ add("all","From the top");
+ [...new Set(DATA.items.map(it=>it.act).filter(Boolean))].forEach(a=>add("act:"+a,a));
+}
+buildScope();
+function rangeFor(){
+ const v=scope.value;
+ if(v.startsWith("act:")){
+  const a=v.slice(4);
+  const idxs=DATA.items.map((it,i)=>[it,i]).filter(x=>x[0].act===a).map(x=>x[1]);
+  return [idxs[0],idxs[idxs.length-1]+1];
+ }
+ return [0,DATA.items.length];
+}
+function mark(i){
+ scriptEl.querySelectorAll(".row.now").forEach(r=>r.classList.remove("now"));
+ const r=scriptEl.querySelector('.row[data-i="'+i+'"]');
+ if(r){r.classList.add("now");r.scrollIntoView({block:"center",behavior:"smooth"});}
+}
+function step(){
+ if(!running||paused)return;
+ if(idx>=endAt){stop();return;}
+ const t=++token,it=DATA.items[idx];
+ mark(idx);
+ if(!it.t){const w=playSfx(it.x);
+  setTimeout(()=>{if(t===token&&running&&!paused){idx++;step();}},w+200);return;}
+ const w=playSfx(it.x);
+ setTimeout(()=>{if(t!==token||!running||paused)return;
+  speak(it.t,it.p,it.s,()=>{if(t===token&&running&&!paused){idx++;
+   setTimeout(step,120);}},it.l);},w);
+}
+function start(from){
+ const [a,b]=rangeFor();
+ idx=from!=null?from:a;endAt=b;
+ if(idx<a||idx>=b){idx=a;}
+ running=true;paused=false;
+ startbtn.style.display="none";pausebtn.style.display="";
+ pausebtn.textContent="\\u23F8";
+ if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();
+ if(AC.state==="suspended")AC.resume();
+ try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u);}catch(_){/**/}
+ lockWake();step();
+}
+function stop(){running=false;paused=false;unlockWake();hush();token++;
+ startbtn.style.display="";pausebtn.style.display="none";}
+startbtn.onclick=()=>start(pickedFrom);
+scriptEl.addEventListener("click",e=>{
+ const r=e.target.closest(".row");if(!r)return;
+ const i=+r.dataset.i;
+ if(running){token++;hush();idx=i;setTimeout(step,120);}
+ else{pickedFrom=i;mark(i);}
+});
+scope.onchange=()=>{if(running)stop();pickedFrom=null;};
+pausebtn.onclick=()=>{
+ if(paused){paused=false;pausebtn.textContent="\\u23F8";step();}
+ else{paused=true;token++;hush();pausebtn.textContent="\\u25B6";}
+};
+let autoPaused=false;
+document.addEventListener("visibilitychange",()=>{
+ if(document.hidden&&running&&!paused){pausebtn.onclick();autoPaused=true;}
+ else if(!document.hidden&&running){lockWake();
+  if(paused&&autoPaused){autoPaused=false;pausebtn.onclick();}}});
+let wake=null;
+async function lockWake(){try{
+ if("wakeLock" in navigator&&!wake){wake=await navigator.wakeLock.request("screen");
+  wake.addEventListener("release",()=>{wake=null;});}}catch(_){/**/}}
+function unlockWake(){if(wake){wake.release().catch(()=>{});wake=null;}}
+</script></body></html>
+"""
+
+
+def build_read_through(speeches, outdir, build):
+    """The eleventh cast member: the whole play as one listen-along
+    page. Every speech in order, real voices where they exist, the same
+    synthesized effects, tap-to-start-anywhere."""
+    items = []
+    for s in speeches:
+        if s["speaker"] and s["say"]:
+            items.append({"s": s["speaker"], "t": s["say"],
+                          "l": line_id(s["speaker"], s["say"]),
+                          "p": pace_of(s["text"]), "x": s["sfx"],
+                          "act": s["act"]})
+        elif s["sfx"]:
+            items.append({"s": "", "t": "", "x": s["sfx"],
+                          "act": s["act"]})
+    data = {"items": items, "voices": VOICE_PROFILES, "avatars": AVATARS}
+    html = (READ_TEMPLATE
+            .replace("__BUILD__", build)
+            .replace("__DATA__", json.dumps(data, ensure_ascii=False)))
+    path = os.path.join(outdir, "FULL_READ_THROUGH.html")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(html)
+    print("%-14s %4d speeches -> %s"
+          % ("READ THROUGH", len(items), path))
+
+
 def main():
     if len(sys.argv) != 4:
         sys.exit(__doc__)
@@ -976,6 +1229,10 @@ def main():
             fh.write(html)
         print("%-14s %4d lines, %2d scene-runs -> %s"
               % (name, len(lines), len(runs), path))
+
+    build_read_through(
+        speeches, outdir,
+        datetime.datetime.now().strftime("%b %d, %I:%M %p"))
 
 
 if __name__ == "__main__":

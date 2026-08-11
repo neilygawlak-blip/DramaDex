@@ -137,6 +137,13 @@ def mp3_out(ff, wav, dest):
 def speakable(say):
     """Nudge script text toward something a TTS reads naturally."""
     t = say.replace("--", ", ").replace("…", "...")
+    # An ellipsis reads as a long dramatic pause, and F5 budgets output
+    # length from the text: it runs dry mid-pause and clips whatever
+    # follows ("better . . . alone" lost its alone). A comma keeps the
+    # beat and the words; the page still displays the printed ellipsis.
+    t = re.sub(r"(?:\.\s*){3,}", ", ", t)
+    t = re.sub(r"\s+,", ",", t)
+    t = re.sub(r",\s*$", ".", t.strip())
     return re.sub(r"\s+", " ", t).strip()
 
 
@@ -168,13 +175,47 @@ def median_f0(ff, path):
     return float(voiced.median()) if len(voiced) else 0
 
 
-def drift_patrol(tts, ff, ref, outdir, says, speed):
-    """The judgment pass: F5 occasionally drifts a short shouty line
-    into a different voice entirely. Every clip's pitch is measured
-    against the batch's own register (each actor is their own norm), and
-    an off-register clip is rerolled on fresh seeds -- with the
-    exclamation marks calmed to periods as the last resort, which
-    reliably talks the model down.
+_whisper = None
+
+
+def transcript_of(path):
+    global _whisper
+    if _whisper is None:
+        from faster_whisper import WhisperModel
+        _whisper = WhisperModel("base.en", device="cpu",
+                                compute_type="int8")
+    segs, _ = _whisper.transcribe(path, beam_size=1)
+    return " ".join(s.text.strip() for s in segs)
+
+
+def ending_ok(transcript, say):
+    """Did the line's last words survive into the audio? F5 sometimes
+    runs out of duration budget and clips the tail mid-sentence.
+    Fuzzy on purpose: Whisper cannot spell a shouted Tovarisch, and an
+    exact match damned four perfectly complete Russian exclamations to
+    eternal rerolls."""
+    import difflib
+
+    strip = lambda s: re.findall(r"[a-z']+", s.lower())
+    said, want = strip(transcript), strip(say)
+    if not want:
+        return True
+    if not said:
+        return False
+    w = want[-1]
+    return any(difflib.SequenceMatcher(None, h, w).ratio() >= .6
+               for h in said[-4:])
+
+
+def quality_patrol(tts, ff, ref, outdir, says, speed):
+    """The judgment pass, two ears. Pitch: F5 occasionally drifts a
+    short shouty line into a different voice entirely; every clip is
+    measured against the batch's own register (each actor is their own
+    norm). Completeness: F5 sometimes clips the tail of a line, so each
+    clip is transcribed and the line's ending must be present in the
+    audio. A failing clip is rerolled on fresh seeds -- exclamation
+    marks calmed to periods as the pitch last resort -- and the best
+    attempt is kept: ending intact beats everything, then pitch.
     """
     import random
     import statistics
@@ -187,29 +228,47 @@ def drift_patrol(tts, ff, ref, outdir, says, speed):
     # register), not an excited one: shouted lines legitimately run
     # half again over the median and must not be "fixed".
     in_register = lambda v: .55 <= v / med <= 1.7
-    off = {lid for lid, v in f0s.items()
-           if v and lid in says and not in_register(v)}
-    print("register %d Hz; %d clip(s) off-register" % (med, len(off)))
+    bad = {}
+    for lid, p in sorted(clips.items()):
+        if lid not in says:
+            continue
+        reasons = []
+        if f0s[lid] and not in_register(f0s[lid]):
+            reasons.append("off-register (%d Hz)" % f0s[lid])
+        if not ending_ok(transcript_of(p), says[lid]):
+            reasons.append("ending clipped")
+        if reasons:
+            bad[lid] = ", ".join(reasons)
+    print("register %d Hz; %d clip(s) flagged" % (med, len(bad)))
     tmp = os.path.join(outdir, "_reroll.wav")
-    for lid in sorted(off):
-        texts = [speakable(says[lid])] * 3 + \
-                [speakable(says[lid]).replace("!", ".")] * 3
-        best_f, best = f0s[lid], open(clips[lid], "rb").read()
-        for t, gen in enumerate(texts, 1):
+    for lid, why in sorted(bad.items()):
+        say = says[lid]
+        texts = [speakable(say)] * 4 + [speakable(say).replace("!", ".")] * 2
+        # Rank attempts: ending intact beats everything, then pitch
+        # distance from the register.
+        score = lambda f, ok: (0 if ok else 1, abs((f or 0) - med))
+        best = (score(f0s[lid], "clipped" not in why),
+                open(clips[lid], "rb").read(), f0s[lid])
+        tries = 0
+        for gen in texts:
+            tries += 1
             tts.infer(ref_file=ref, ref_text="", gen_text=gen,
                       file_wave=tmp, speed=speed, remove_silence=True,
                       seed=random.randint(0, 2**31 - 1))
             mp3_out(ff, tmp, clips[lid])
             f = median_f0(ff, clips[lid])
-            if f and abs(f - med) < abs(best_f - med):
-                best_f, best = f, open(clips[lid], "rb").read()
-            if f and in_register(f):
+            ok = ending_ok(transcript_of(clips[lid]), say)
+            s = score(f, ok)
+            if s < best[0]:
+                best = (s, open(clips[lid], "rb").read(), f)
+            if ok and f and in_register(f):
                 break
         with open(clips[lid], "wb") as fh:
-            fh.write(best)
-        print("  %s: %d -> %d Hz after %d tr%s  %.40s"
-              % (lid, f0s[lid], best_f, t, "y" if t == 1 else "ies",
-                 says[lid]))
+            fh.write(best[1])
+        print("  %s [%s] -> %d Hz, ending %s, %d tr%s  %.40s"
+              % (lid, why, best[2] or 0,
+                 "ok" if best[0][0] == 0 else "STILL CLIPPED",
+                 tries, "y" if tries == 1 else "ies", say))
     if os.path.exists(tmp):
         os.remove(tmp)
 
@@ -315,7 +374,14 @@ def main():
         print("  %4d/%d  %s  %.48s" % (n, len(todo), lid, say))
 
     says = {line_id(who, s["say"]): s["say"] for s in speeches}
-    drift_patrol(tts, ff, ref, outdir, says, args.speed)
+    quality_patrol(tts, ff, ref, outdir, says, args.speed)
+
+    # A text edit changes the line id: the old clip is an orphan nothing
+    # references. Retire it so the shelf only holds current lines.
+    for f in os.listdir(outdir):
+        if f.endswith(".mp3") and f[:-4] not in says:
+            os.remove(os.path.join(outdir, f))
+            print("pruned orphan clip %s" % f)
 
     manifest_path = os.path.join(VOICES, "manifest.json")
     manifest = {}
