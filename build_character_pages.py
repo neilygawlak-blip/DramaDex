@@ -423,9 +423,10 @@ just speak when it's your turn.</div>
 <div id="controls">
  <select id="scope"></select>
  <select id="mode">
-  <option value="drill">Just cue lines</option>
-  <option value="scene">Full scene (waits for you)</option>
-  <option value="listen">Listen through</option>
+  <option value="scene">Full Scene (waits for you)</option>
+  <option value="drill">Cue Lines Only (in order)</option>
+  <option value="quiz">Cue Lines Random (quiz challenge)</option>
+  <option value="listen">Full Read Through</option>
  </select>
  <label id="voxwrap" style="display:none;font-size:.85rem;color:#9aa4c0">
   <input type="checkbox" id="voxchk" checked> &#127908; Real voices</label>
@@ -770,7 +771,7 @@ function step(){
  const t=++token;
  const l=DATA.lines[queue[pos]];heard="";simArmed=false;
  setWhere(l);
- if(mode.value==="drill"){
+ if(mode.value==="drill"||mode.value==="quiz"){
   show(l,false);
   const wait=playSfx(l.cue.sfx);
   setTimeout(()=>{if(t!==token||!running||paused)return;
@@ -842,6 +843,11 @@ function doneEnough(l){
 
 function start(q){
  queue=q||currentSet();if(!queue.length){my.textContent="Nothing in that run.";return;}
+ // Quiz challenge: same drill, but the cue lines come at you in a
+ // random order every run (Fisher-Yates).
+ if(mode.value==="quiz"){queue=[...queue];
+  for(let i=queue.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));
+   [queue[i],queue[j]]=[queue[j],queue[i]];}}
  pos=0;running=true;paused=false;
  pausebtn.textContent="\\u23F8";pausebtn.title="pause";
  startbtn.style.display="none";pausebtn.style.display="";
