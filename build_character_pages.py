@@ -193,6 +193,10 @@ SFX_RE = [
     ("bump", re.compile(r"bumping noise|bumps in|loud HAMMERING|KNOCK from",
                         re.I)),
     ("bell", re.compile(r"\bBELL rings\b|rings servant bell", re.I)),
+    ("scream", re.compile(r"scream|shriek", re.I)),
+    ("voices", re.compile(r"murmur of voices|VOICES off", re.I)),
+    ("gasp", re.compile(r"little gasp|with a loud cry", re.I)),
+    ("sing", re.compile(r"sings the first two lines|singing ex?ercises", re.I)),
 ]
 
 
@@ -511,9 +515,19 @@ const SFX={
  church(){[392,330,294,262].forEach((f,i)=>tone(f,i*.7,1.6,"sine",.3));},
  slam(){noise(0,.18);tone(70,0,.25,"sine",.5);},
  bump(){[0,.4,.8].forEach(t=>{noise(t,.1);tone(90,t,.15,"sine",.4);});},
+ scream(){const o=AC.createOscillator(),g=AC.createGain();o.type="sawtooth";
+  o.frequency.setValueAtTime(950,AC.currentTime);
+  o.frequency.exponentialRampToValueAtTime(320,AC.currentTime+.9);
+  g.gain.setValueAtTime(.18,AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.9);
+  o.connect(g).connect(AC.destination);o.start();o.stop(AC.currentTime+.9);},
+ voices(){[0,.25,.55,.8,1.1].forEach((t,i)=>tone(140+(i%3)*40,t,.22,"sine",.14));},
+ gasp(){tone(300,0,.12,"sine",.2);tone(520,.1,.25,"sine",.25);},
+ sing(){[262,330,392,523].forEach((f,i)=>tone(f,i*.28,.26,"sine",.2));},
 };
 function playSfx(n){if(!n)return 0;if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();SFX[n]();
- return n==="church"?3000:n==="phone"?2300:n==="slam"?500:n==="bump"?1300:1200;}
+ return n==="church"?3000:n==="phone"?2300:n==="slam"?500:n==="bump"?1300
+  :n==="voices"?1500:n==="sing"?1400:n==="scream"?1000:n==="gasp"?600:1200;}
 
 // ---- forgiving word diff, the workbench tiers ----
 const norm=s=>s.toLowerCase().replace(/[^a-z0-9' ]+/g," ").replace(/\\s+/g," ").trim();
@@ -1060,9 +1074,19 @@ const SFX={
  church(){[392,330,294,262].forEach((f,i)=>tone(f,i*.7,1.6,"sine",.3));},
  slam(){noise(0,.18);tone(70,0,.25,"sine",.5);},
  bump(){[0,.4,.8].forEach(t=>{noise(t,.1);tone(90,t,.15,"sine",.4);});},
+ scream(){const o=AC.createOscillator(),g=AC.createGain();o.type="sawtooth";
+  o.frequency.setValueAtTime(950,AC.currentTime);
+  o.frequency.exponentialRampToValueAtTime(320,AC.currentTime+.9);
+  g.gain.setValueAtTime(.18,AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.9);
+  o.connect(g).connect(AC.destination);o.start();o.stop(AC.currentTime+.9);},
+ voices(){[0,.25,.55,.8,1.1].forEach((t,i)=>tone(140+(i%3)*40,t,.22,"sine",.14));},
+ gasp(){tone(300,0,.12,"sine",.2);tone(520,.1,.25,"sine",.25);},
+ sing(){[262,330,392,523].forEach((f,i)=>tone(f,i*.28,.26,"sine",.2));},
 };
 function playSfx(n){if(!n)return 0;if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();SFX[n]();
- return n==="church"?3000:n==="phone"?2300:n==="slam"?500:n==="bump"?1300:1200;}
+ return n==="church"?3000:n==="phone"?2300:n==="slam"?500:n==="bump"?1300
+  :n==="voices"?1500:n==="sing"?1400:n==="scream"?1000:n==="gasp"?600:1200;}
 
 // ---- voices (same picker as the practice pages) ----
 const FEM=/female|zira|hazel|susan|heather|catherine|linda|samantha|karen|serena|kate|fiona|moira|tessa|libby|sonia|aria|jenny|michelle/i;
