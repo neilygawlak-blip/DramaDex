@@ -68,6 +68,20 @@ INDEX = """<!DOCTYPE html>
  .subacts a{flex:1;text-align:center;padding:.45rem .4rem;margin:0;
    font-size:.88rem;color:#9aa4c0}
  hr.castbreak{border:none;border-top:1px solid #2b3a5e;margin:1.1rem 0}
+ /* Who's in the Discord voice channel. Deliberately quiet, and gone
+    entirely when nobody is in there: an empty row of grey dots would be
+    noise on every visit. */
+ #voicebar{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem;
+   margin:0 0 .7rem;font-family:system-ui,sans-serif;font-size:.78rem;
+   color:#7d87a3}
+ #voicebar .vlabel{text-transform:uppercase;letter-spacing:.08em;
+   color:#55618a;font-size:.68rem}
+ #voicebar .vchip{padding:.12rem .5rem;border-radius:999px;
+   background:#111a30;border:1px solid #2b3a5e;color:#c9d2ea}
+ #voicebar .vchip.vmute{color:#7d87a3;border-style:dashed}
+ #voicebar a{display:inline;padding:0;margin:0 0 0 .2rem;border:none;
+   background:none;border-radius:0;color:#ffd75e;font-size:.76rem}
+ #voicebar a:hover{box-shadow:none;text-decoration:underline}
  .micbox{width:44px;height:66px;flex:none;display:flex;align-items:center;
    justify-content:center;border-radius:10px;
    background:linear-gradient(180deg,#182446,#0c1428);border:1px solid #3a4a75;
@@ -91,6 +105,9 @@ thing in your car.</p>
 </div>
 <div id="cols">
 <div id="cast">
+<div id="voicebar" hidden><span class="vlabel">&#127908; in voice</span><span
+ id="vwho"></span><a id="vjoin" target="_blank" rel="noopener" hidden>join
+ &#8250;</a></div>
 __LINKS__
 </div>
 <aside>
@@ -112,6 +129,37 @@ __LINKS__
 </a>
 </aside>
 </div>
+<script>
+// Presence strip. Polls the worker, which caches Discord's widget, so
+// this is one small request every 20s and only while the tab is visible.
+// Every failure mode -- widget off, Discord down, offline laptop -- ends
+// at the same place: the strip hides and the page is exactly as it was.
+(function(){
+ const bar=document.getElementById("voicebar"),
+       who=document.getElementById("vwho"),
+       join=document.getElementById("vjoin");
+ // Discord display names are typed by their owners, so they are escaped
+ // before they touch innerHTML.
+ const esc=s=>String(s).replace(/[&<>"]/g,
+   c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+ async function poll(){
+  try{
+   const r=await fetch("/api/voice-presence",{cache:"no-store"});
+   const d=await r.json(),list=d.inVoice||[];
+   if(!list.length){bar.hidden=true;return;}
+   // A dashed, dimmer chip means muted: in the channel but not talking.
+   who.innerHTML=list.map(m=>'<span class="vchip'+(m.muted?" vmute":"")+
+     '" title="'+esc(m.room||"voice")+(m.muted?" (muted)":"")+'">'+
+     esc(m.name)+"</span>").join("");
+   if(d.invite){join.href=d.invite;join.hidden=false;}else{join.hidden=true;}
+   bar.hidden=false;
+  }catch(_){bar.hidden=true;}
+ }
+ poll();
+ setInterval(()=>{if(!document.hidden)poll();},20000);
+ document.addEventListener("visibilitychange",()=>{if(!document.hidden)poll();});
+})();
+</script>
 </body></html>
 """
 
