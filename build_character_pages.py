@@ -83,6 +83,43 @@ MOODS = [(e, re.compile(rx, re.I)) for e, rx in MOODS]
 NEUTRAL = "\U0001F642"
 
 
+# ---------------------------------------------------------------------
+# Per-play configuration. The constants above are See How They Run's
+# (kept as module globals so french_scenes/make_voice imports keep
+# working); INTERMISSION gets its own set here. A new play = a new
+# entry, per NEW_PLAY.md Phase 6.
+# ---------------------------------------------------------------------
+
+INT_AVATARS = {
+    "LILI":     "\U0001F484\U0001F4FA",  # soap star: lipstick and TV
+    "COLLETTE": "\U0001F3AD\U0001F451",  # stage royalty
+    "HALEY":    "\U0001F575️\U0001F4DD",  # detective with the notepad
+    "ARNOLD":   "\U0001F4CB\U0001F527",  # clipboard and the multi-tool
+    "LENORE":   "⭐\U0001F3B5",           # ingenue off to her musical
+    "KRISTIN":  "\U0001F378\U0001F3B2",  # the waitress, Uncle Gino's dice
+    "BRANDON":  "\U0001F943\U0001F339",  # leading man, flask and charm
+    "VOICE":    "\U0001F4E2",            # the cop outside the door
+    "FULL READ THROUGH": "\U0001F3A7\U0001F4D6",
+}
+
+INT_VOICES = {
+    "LILI":     {"g": "f", "style": "casual", "mult": 1.0},
+    "COLLETTE": {"g": "f", "style": "proper", "mult": 1.0},
+    "HALEY":    {"g": "m", "style": "casual", "mult": 1.0},
+    "ARNOLD":   {"g": "m", "style": "casual", "mult": 1.15},
+    "LENORE":   {"g": "f", "style": "casual", "mult": 1.1},
+    "KRISTIN":  {"g": "f", "style": "casual", "mult": 1.15},
+    "BRANDON":  {"g": "m", "style": "proper", "mult": 0.95},
+    "VOICE":    {"g": "m", "style": "casual", "mult": 1.0},
+}
+
+# Case-strict where dialogue could otherwise ring the effect (the
+# church-bells lesson): the typescript shouts real cues in caps.
+INT_SFX = [
+    ("bump", re.compile(r"KNOCK AT (THE )?DOOR")),
+    ("phone", re.compile(r"[Pp]hone rings|phone buzzes")),
+]
+
 def line_id(speaker, say):
     """Stable id for a spoken line: changes only when the words change.
     Keys the pre-rendered real-voice clips (voices/<CHAR>/<id>.mp3), so a
@@ -200,6 +237,29 @@ SFX_RE = [
 ]
 
 
+PLAYS = {
+    "shtr": {
+        "title": "See How They Run", "author": "Philip King",
+        "raw": "private/see_how_they_run_fixed.txt",
+        "cast": "private/cast_see_how_they_run.txt",
+        "prefix": "", "home": "see_how_they_run.html",
+        "acts": 3, "act_pages": ACT_PAGES, "back_matter": BACK_MATTER,
+        "no_page": NO_PAGE, "avatars": AVATARS,
+        "voices": VOICE_PROFILES, "sfx": SFX_RE,
+    },
+    "intermission": {
+        "title": "INTERMISSION", "author": "Gale Baker",
+        "raw": "private/intermission_raw.txt",
+        "cast": "private/cast_intermission.txt",
+        "prefix": "INT_", "home": "intermission.html",
+        "acts": 2,
+        "act_pages": {"Act I": (3, 27), "Act II": (28, 51)},
+        "back_matter": (), "no_page": {"VOICE"},
+        "avatars": INT_AVATARS, "voices": INT_VOICES, "sfx": INT_SFX,
+    },
+}
+
+
 def spoken(text, speaker):
     """What the actor actually says: no name, no stage directions."""
     t = text
@@ -213,7 +273,8 @@ def spoken(text, speaker):
     return re.sub(r"\s+", " ", t).strip()
 
 
-def parse(rawfile, cast):
+def parse(rawfile, cast, cfg=None):
+    cfg = cfg or PLAYS["shtr"]
     speech_re = re.compile(
         r"^(%s)\b" % "|".join(re.escape(c) for c in
                               sorted(cast, key=len, reverse=True)))
@@ -228,10 +289,10 @@ def parse(rawfile, cast):
         # first spoken line is what actually opens the act.
         if act == "Front matter" and speech_re.match(p):
             act = "Act I"
-        if any(p.startswith(b) for b in BACK_MATTER):
+        if any(p.startswith(b) for b in cfg["back_matter"]):
             break
         m = speech_re.match(p)
-        sfx = next((n for n, rx in SFX_RE if rx.search(p)), None)
+        sfx = next((n for n, rx in cfg["sfx"] if rx.search(p)), None)
         # A paragraph with no name that is not a direction or a heading is
         # a splinter of the speech before it: OCR broke the paragraph, and
         # unstitched it would simply vanish from every page.
@@ -255,18 +316,18 @@ def parse(rawfile, cast):
             "say": spoken(p, m.group(1)) if m else "",
             "sfx": sfx,
         })
-    number_pages(speeches)
+    number_pages(speeches, cfg["act_pages"])
     tag_together(speeches)
     return speeches
 
 
-def number_pages(speeches):
+def number_pages(speeches, act_pages):
     """Give every speech its printed page, interpolated within its act."""
     by_act = {}
     for i, s in enumerate(speeches):
         by_act.setdefault(s["act"], []).append(i)
     for act, idxs in by_act.items():
-        lo, hi = ACT_PAGES.get(act, (0, 0))
+        lo, hi = act_pages.get(act, (0, 0))
         for j, i in enumerate(idxs):
             speeches[i]["page"] = (lo + j * (hi - lo + 1) // len(idxs)
                                    if lo else 0)
@@ -339,7 +400,7 @@ def cue_for(speeches, i):
 TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>__NAME__ — See How They Run</title>
+<title>__NAME__ — __PLAY__</title>
 <style>
  body{font-family:"Segoe UI Variable Display","Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
       font-weight:500;letter-spacing:.012em;max-width:640px;margin:2rem auto;
@@ -421,7 +482,7 @@ TEMPLATE = """<!DOCTYPE html>
  #build{position:fixed;bottom:.3rem;left:0;right:0;text-align:center;
       font-size:.58rem;color:#20294a;pointer-events:none}
 </style></head><body>
-<h1>__AVATAR__ __NAME__ <span class="muted">— See How They Run</span></h1>
+<h1>__AVATAR__ __NAME__ <span class="muted">— __PLAY__</span></h1>
 <div class="muted">__COUNT__ lines. Pick a scene, press the pineapple, and
 just speak when it's your turn.</div>
 <div id="controls">
@@ -444,7 +505,7 @@ just speak when it's your turn.</div>
 <div id="stage"></div>
 <div id="where"></div>
 <div id="nailfx"></div>
-<a id="backbtn" href="index.html">&#8592; Back to Character List</a>
+<a id="backbtn" href="__HOME__">&#8592; Back to Cast List</a>
 <a id="reportbtn" href="#">&#9888; Tell Neil it broke</a>
 <div id="build">build __BUILD__</div>
 <script>
@@ -979,7 +1040,7 @@ function initMic(){
 READ_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Full Read Through — See How They Run</title>
+<title>Full Read Through — __PLAY__</title>
 <style>
  body{font-family:"Segoe UI Variable Display","Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
       font-weight:500;letter-spacing:.012em;max-width:640px;margin:0 auto;
@@ -1013,7 +1074,7 @@ READ_TEMPLATE = """<!DOCTYPE html>
       font-size:.58rem;color:#20294a;pointer-events:none}
 </style></head><body>
 <div id="top">
-<h1>&#127911; Full Read Through <span class="muted">— See How They Run</span></h1>
+<h1>&#127911; Full Read Through <span class="muted">— __PLAY__</span></h1>
 <div class="muted">The whole play, performed aloud. Press play, or tap
 any line to start from there.</div>
 <select id="scope"></select>
@@ -1025,7 +1086,7 @@ any line to start from there.</div>
 <button class="primary" id="startbtn">&#127821; Play</button>
 </div>
 <div id="script"></div>
-<a id="backbtn" href="index.html">&#8592; Back to Cast List</a>
+<a id="backbtn" href="__HOME__">&#8592; Back to Cast List</a>
 <button id="pausebtn" title="pause">&#9208;</button>
 <div id="build">build __BUILD__</div>
 <script>
@@ -1255,9 +1316,9 @@ function unlockWake(){if(wake){wake.release().catch(()=>{});wake=null;}}
 """
 
 
-def build_read_through(speeches, outdir, build):
-    """The eleventh cast member: the whole play as one listen-along
-    page. Every speech in order, real voices where they exist, the same
+def build_read_through(speeches, outdir, build, cfg):
+    """The extra cast member: the whole play as one listen-along page.
+    Every speech in order, real voices where they exist, the same
     synthesized effects, tap-to-start-anywhere."""
     items = []
     for s in speeches:
@@ -1281,31 +1342,32 @@ def build_read_through(speeches, outdir, build):
         elif s["sfx"]:
             items.append({"s": "", "t": "", "x": s["sfx"],
                           "act": s["act"]})
-    data = {"items": items, "voices": VOICE_PROFILES, "avatars": AVATARS}
+    data = {"items": items, "voices": cfg["voices"],
+            "avatars": cfg["avatars"]}
     html = (READ_TEMPLATE
             .replace("__BUILD__", build)
+            .replace("__PLAY__", cfg["title"])
+            .replace("__HOME__", cfg["home"])
             .replace("__DATA__", json.dumps(data, ensure_ascii=False)))
-    path = os.path.join(outdir, "FULL_READ_THROUGH.html")
+    path = os.path.join(outdir, cfg["prefix"] + "FULL_READ_THROUGH.html")
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(html)
     print("%-14s %4d speeches -> %s"
           % ("READ THROUGH", len(items), path))
 
 
-def main():
-    if len(sys.argv) != 4:
-        sys.exit(__doc__)
-    rawfile, castfile, outdir = sys.argv[1:4]
+def build_play(cfg, outdir):
     # utf-8-sig: Windows editors and PowerShell love to prepend a BOM, and
     # an invisible byte glued to the first name silently drops that
     # character's every line.
-    cast = [l.strip() for l in open(castfile, encoding="utf-8-sig")
+    cast = [l.strip() for l in open(cfg["cast"], encoding="utf-8-sig")
             if l.strip()]
-    speeches = parse(rawfile, cast)
+    speeches = parse(cfg["raw"], cast, cfg)
     os.makedirs(outdir, exist_ok=True)
+    print("== %s — by %s ==" % (cfg["title"], cfg["author"]))
 
     for name in cast:
-        if name in NO_PAGE:
+        if name in cfg["no_page"]:
             continue
         lines, prev = [], -1
         for i, s in enumerate(speeches):
@@ -1343,16 +1405,19 @@ def main():
         if not lines:
             continue
         runs = runs_for(speeches, name)
-        data = {"lines": lines, "runs": runs, "voices": VOICE_PROFILES,
-                "avatars": AVATARS}
+        data = {"lines": lines, "runs": runs, "voices": cfg["voices"],
+                "avatars": cfg["avatars"]}
         build = datetime.datetime.now().strftime("%b %d, %I:%M %p")
         html = (TEMPLATE
-                .replace("__AVATAR__", AVATARS.get(name, ""))
+                .replace("__AVATAR__", cfg["avatars"].get(name, ""))
                 .replace("__NAME__", name)
+                .replace("__PLAY__", cfg["title"])
+                .replace("__HOME__", cfg["home"])
                 .replace("__COUNT__", str(len(lines)))
                 .replace("__BUILD__", build)
                 .replace("__DATA__", json.dumps(data, ensure_ascii=False)))
-        path = os.path.join(outdir, name.replace(" ", "_") + ".html")
+        path = os.path.join(outdir,
+                            cfg["prefix"] + name.replace(" ", "_") + ".html")
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(html)
         print("%-14s %4d lines, %2d scene-runs -> %s"
@@ -1360,7 +1425,17 @@ def main():
 
     build_read_through(
         speeches, outdir,
-        datetime.datetime.now().strftime("%b %d, %I:%M %p"))
+        datetime.datetime.now().strftime("%b %d, %I:%M %p"), cfg)
+
+
+def main():
+    keys = sys.argv[1:] or list(PLAYS)
+    bad = [k for k in keys if k not in PLAYS]
+    if bad:
+        sys.exit("unknown play key(s) %s — known: %s"
+                 % (", ".join(bad), ", ".join(PLAYS)))
+    for k in keys:
+        build_play(PLAYS[k], os.path.join("private", "handouts"))
 
 
 if __name__ == "__main__":

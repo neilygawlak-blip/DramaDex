@@ -1,11 +1,10 @@
 """Assemble the folder that gets uploaded to Cloudflare Pages.
 
-Collects the freshly built character pages, adds a landing page for the
-cast, the Voice Booth (records samples for Neil's Lab), the upload
-worker, any rendered real-voice clips, and the headers that keep a
-licensed script out of search engines. The whole folder is what gets
-deployed. Nothing here is the deployment itself: the account, the upload
-and the email gate stay in your hands, per DEPLOY.md alongside.
+Collects the freshly built character pages for every play, builds the
+Choose Your Play front page and one cast page per play, adds the Voice
+Booth (records samples for Neil's Lab), the upload worker, any rendered
+real-voice clips, and the headers that keep licensed scripts out of
+search engines. The whole folder is what gets deployed.
 
 Usage:
     python prep_deploy.py private/handouts private/deploy
@@ -16,7 +15,7 @@ import os
 import shutil
 import sys
 
-from build_character_pages import AVATARS
+from build_character_pages import PLAYS
 
 INDEX = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
@@ -89,26 +88,26 @@ INDEX = """<!DOCTYPE html>
  .micbox svg{width:24px;height:38px;
    filter:drop-shadow(0 3px 5px rgba(0,0,0,.75)) drop-shadow(0 0 6px rgba(255,183,71,.5))}
  @media (max-width:720px){#cols{flex-direction:column}aside{width:100%;position:static;margin-top:1.2rem}}
+ a.play{padding:1rem 1.1rem}
+ a.play b{display:block;font-size:1.05rem;color:#ffd75e;letter-spacing:.06em;
+   text-shadow:0 0 8px rgba(255,183,71,.4)}
+ a.play span{display:block;margin-top:.15rem;color:#9aa4c0;font-size:.85rem}
+ h2.choose{color:#e8e6df;font-size:1.05rem;margin:1.4rem 0 .5rem;
+   letter-spacing:.05em}
 </style></head><body>
-<h1>&#127821; See How They Run — pick your character</h1>
+<h1>&#127821; Pineapple Playhouse</h1>
 <div class="intro">
 <p style="color:#ffd75e">I built this for repetition and line-learning.
 Always ask your cast mates to run lines first if you can. It's always
 more fun with friends.</p>
-<p>Pick a scene, press the pineapple. Speak your line when the cue
-finishes; it moves on when you land your last word.</p>
-<p>Call for <b>one word</b>, or <b>full line</b>, just like calling for
-line in rehearsal. Arrow keys skip around.</p>
-<p>Practice with <b>just Cue Lines</b>, or <b>Full scene</b> plays
-everyone else and waits for you; or <b>Listen through</b> the whole
-thing in your car.</p>
 </div>
+<h2 class="choose">Choose Your Play</h2>
 <div id="cols">
 <div id="cast">
 <div id="voicebar" hidden><span class="vlabel">&#127908; in voice</span><span
  id="vwho"></span><a id="vjoin" target="_blank" rel="noopener" hidden>join
  &#8250;</a></div>
-__LINKS__
+__PLAYLINKS__
 </div>
 <aside>
 <a class="door-btn" href="french_scenes.html">
@@ -160,6 +159,48 @@ __LINKS__
  document.addEventListener("visibilitychange",()=>{if(!document.hidden)poll();});
 })();
 </script>
+</body></html>
+"""
+
+PLAYPAGE = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>__TITLE__ — pick your character</title>
+<style>
+ body{font-family:Georgia,serif;max-width:640px;margin:3rem auto;padding:0 1rem 4rem;
+      background:#0a0f1e;color:#e8e6df;line-height:1.6}
+ h1{color:#ffd75e;font-size:1.4rem;text-shadow:0 0 10px rgba(255,183,71,.5)}
+ h1 small{display:block;font-size:.85rem;color:#9aa4c0;text-shadow:none;
+   letter-spacing:.04em;margin-top:.15rem}
+ a{display:block;padding:.7rem 1rem;margin:.4rem 0;border:1px solid #2b3a5e;
+   border-radius:10px;color:#e8e6df;text-decoration:none;background:#111a30}
+ a:hover{border-color:#ffd75e;box-shadow:0 0 10px rgba(255,183,71,.35)}
+ .intro{margin:1rem 0 1.6rem}
+ .intro p{color:#9aa4c0;font-size:.92rem;margin:.55rem 0;line-height:1.55}
+ .intro b{color:#c9d2ea;font-weight:600}
+ .subacts{display:flex;gap:.5rem;margin:.4rem 0 0}
+ .subacts a{flex:1;text-align:center;padding:.45rem .4rem;margin:0;
+   font-size:.88rem;color:#9aa4c0}
+ hr.castbreak{border:none;border-top:1px solid #2b3a5e;margin:1.1rem 0}
+ #backbtn{position:fixed;bottom:1.2rem;left:1.2rem;font-size:.75rem;
+   color:#7d87a3;background:#0d1526;border:1px solid #2b3a5e;
+   border-radius:999px;padding:.35rem .8rem;text-decoration:none;
+   box-shadow:0 2px 8px rgba(0,0,0,.5)}
+ #backbtn:hover{border-color:#ffd75e;color:#e8e6df}
+</style></head><body>
+<h1>&#127821; __TITLE__ <small>by __AUTHOR__</small></h1>
+<div class="intro">
+<p>Pick a scene, press the pineapple. Speak your line when the cue
+finishes; it moves on when you land your last word.</p>
+<p>Call for <b>one word</b>, or <b>full line</b>, just like calling for
+line in rehearsal. Arrow keys skip around.</p>
+<p>Practice with <b>just Cue Lines</b>, or <b>Full scene</b> plays
+everyone else and waits for you; or <b>Listen through</b> the whole
+thing in your car.</p>
+</div>
+__LINKS__
+<a id="backbtn" href="index.html">&#8592; Choose Your Play</a>
 </body></html>
 """
 
@@ -240,7 +281,11 @@ const CARDS=[
    "delivery, played the way you'd play it on stage."},
 ];
 const whoSel=document.getElementById("who");
-CAST.forEach(c=>{const o=document.createElement("option");o.value=c;o.textContent=c;whoSel.appendChild(o);});
+// CAST is {play title: [character names]}: one optgroup per play.
+Object.entries(CAST).forEach(([play,names])=>{
+ const g=document.createElement("optgroup");g.label=play;
+ names.forEach(c=>{const o=document.createElement("option");o.value=c;o.textContent=c;g.appendChild(o);});
+ whoSel.appendChild(g);});
 
 const takes=CARDS.map(()=>null);   // {blob,type,dur,peak,clip}
 let stream=null,ac=null,an=null,mr=null,chunks=[],recIdx=-1,t0=0,peak=0,clipN=0,frameN=0,raf=0,maxT=0;
@@ -388,26 +433,48 @@ def main():
     for f in os.listdir(dst):
         if f.endswith(".html") and not os.path.exists(os.path.join(src, f)):
             os.remove(os.path.join(dst, f))
-    links = []
-    for f in sorted(os.listdir(src)):
-        if not f.endswith(".html"):
-            continue
+    files = [f for f in sorted(os.listdir(src)) if f.endswith(".html")]
+    for f in files:
         shutil.copy2(os.path.join(src, f), os.path.join(dst, f))
-        key = f[:-5].replace("_", " ")
-        nice = key.title()
-        badge = AVATARS.get(key, "")
-        links.append('<a href="%s">%s %s</a>' % (f, badge, nice))
-    # The read-through leads the list with its act shortcuts, then a
-    # rule, then the actual cast alphabetically.
-    links.sort(key=lambda l: "FULL_READ_THROUGH" not in l)
-    links.insert(1, (
-        '<div class="subacts">'
-        '<a href="FULL_READ_THROUGH.html?act=1">Act I</a>'
-        '<a href="FULL_READ_THROUGH.html?act=2">Act II</a>'
-        '<a href="FULL_READ_THROUGH.html?act=3">Act III</a>'
-        '</div>\n<hr class="castbreak">'))
+
+    # One cast page per play; the front page chooses between them. A
+    # play's files are picked out by its prefix, so the prefixless play
+    # (SHTR, whose URLs predate the chooser) claims what's left.
+    order = ["intermission", "shtr"]
+    other_prefixes = [PLAYS[k]["prefix"] for k in order if PLAYS[k]["prefix"]]
+    playlinks, npages = [], 0
+    for key in order:
+        cfg = PLAYS[key]
+        pre = cfg["prefix"]
+        mine = [f for f in files
+                if (f.startswith(pre) if pre
+                    else not any(f.startswith(p) for p in other_prefixes))]
+        links = []
+        for f in mine:
+            stem = f[len(pre):-5].replace("_", " ")
+            badge = cfg["avatars"].get(stem, "")
+            links.append('<a href="%s">%s %s</a>' % (f, badge, stem.title()))
+        # The read-through leads with its act shortcuts, then a rule,
+        # then the cast alphabetically.
+        links.sort(key=lambda l: "FULL_READ_THROUGH" not in l)
+        acts = "".join(
+            '<a href="%sFULL_READ_THROUGH.html?act=%d">Act %s</a>'
+            % (pre, i, r)
+            for i, r in enumerate(["I", "II", "III"][:cfg["acts"]], 1))
+        links.insert(1, '<div class="subacts">%s</div>\n'
+                        '<hr class="castbreak">' % acts)
+        html = (PLAYPAGE.replace("__TITLE__", cfg["title"])
+                        .replace("__AUTHOR__", cfg["author"])
+                        .replace("__LINKS__", "\n".join(links)))
+        with open(os.path.join(dst, cfg["home"]), "w",
+                  encoding="utf-8") as fh:
+            fh.write(html)
+        npages += len(mine)
+        playlinks.append(
+            '<a class="play" href="%s"><b>%s</b><span>by %s</span></a>'
+            % (cfg["home"], cfg["title"], cfg["author"]))
     with open(os.path.join(dst, "index.html"), "w", encoding="utf-8") as fh:
-        fh.write(INDEX.replace("__LINKS__", "\n".join(links)))
+        fh.write(INDEX.replace("__PLAYLINKS__", "\n".join(playlinks)))
     # The director's workbench ships behind the same gate as the cast.
     fs = os.path.join(os.path.dirname(src), "french_scenes.html")
     if os.path.exists(fs):
@@ -415,9 +482,12 @@ def main():
     # The Voice Booth, its upload worker, and any voices already rendered
     # by Neil's Lab. Cast list comes from AVATARS so even the CHOIRBOY
     # (no practice page, but his lines cue people) can leave a voice.
+    booth_cast = {PLAYS[k]["title"]: sorted(
+        n for n in PLAYS[k]["avatars"] if n != "FULL READ THROUGH")
+        for k in order}
     with open(os.path.join(dst, "voice_booth.html"), "w",
               encoding="utf-8") as fh:
-        fh.write(BOOTH.replace("__CAST__", json.dumps(sorted(AVATARS))))
+        fh.write(BOOTH.replace("__CAST__", json.dumps(booth_cast)))
     here = os.path.dirname(os.path.abspath(__file__))
     shutil.copy2(os.path.join(here, "_worker.js"),
                  os.path.join(dst, "_worker.js"))
@@ -433,7 +503,8 @@ def main():
         fh.write(ROBOTS)
     with open(os.path.join(dst, "DEPLOY.md"), "w", encoding="utf-8") as fh:
         fh.write(DEPLOY_MD)
-    print("%d pages + index + headers -> %s" % (len(links), dst))
+    print("%d pages + chooser + %d play pages -> %s"
+          % (npages, len(playlinks), dst))
     print("read %s/DEPLOY.md for the upload steps" % dst)
 
 

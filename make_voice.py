@@ -46,10 +46,8 @@ import subprocess
 import sys
 import tempfile
 
-from build_character_pages import line_id, parse
+from build_character_pages import PLAYS, line_id, parse
 
-FIXED = os.path.join("private", "see_how_they_run_fixed.txt")
-CASTF = os.path.join("private", "cast_see_how_they_run.txt")
 VOICES = os.path.join("private", "voices")
 
 # Bench thresholds. Below MIN_SECS after trimming there is not enough
@@ -277,6 +275,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("who", help="character name, e.g. MAN")
     ap.add_argument("samples", nargs="+", help="Voice Booth recordings")
+    ap.add_argument("--play", default="shtr", choices=list(PLAYS),
+                    help="which play's script the character belongs to")
     ap.add_argument("--ref-text", default="",
                     help="exact words spoken in the sample "
                          "(default: Whisper-transcribe the kept audio)")
@@ -290,11 +290,12 @@ def main():
     args = ap.parse_args()
     who = args.who.upper()
 
-    cast = [l.strip() for l in open(CASTF, encoding="utf-8-sig")
+    cfg = PLAYS[args.play]
+    cast = [l.strip() for l in open(cfg["cast"], encoding="utf-8-sig")
             if l.strip()]
     if who not in cast:
         sys.exit("%s is not in the cast list (%s)" % (who, ", ".join(cast)))
-    speeches = [s for s in parse(FIXED, cast)
+    speeches = [s for s in parse(cfg["raw"], cast, cfg)
                 if s["speaker"] == who and s["say"]]
     if not speeches:
         sys.exit("no lines found for %s" % who)
