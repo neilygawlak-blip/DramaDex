@@ -489,6 +489,12 @@ TEMPLATE = """<!DOCTYPE html>
       box-shadow:0 2px 10px rgba(0,0,0,.6),0 0 8px rgba(255,183,71,.2)}
  .star{cursor:pointer;border:none;background:none;font-size:1.1rem}
  #mystate{font-size:.85rem;color:#7d87a3}
+ #editbtn{font-size:.72rem;color:#7d87a3;background:#0d1526;border:1px solid #2b3a5e;
+      border-radius:999px;padding:.25rem .7rem;margin-top:.6rem;display:inline-block;cursor:pointer}
+ #editbtn:hover{border-color:#ffd75e;color:#e8e6df}
+ #edittext{width:100%;box-sizing:border-box;min-height:5.5rem;background:#111a30;
+      color:#e8e6df;border:1px solid #ffd75e;border-radius:8px;padding:.5rem;
+      font-size:1rem;font-family:inherit}
  .simchip{display:inline-block;font-size:.72rem;padding:.1rem .55rem;margin-left:.5rem;
       border:1px solid #ffd75e;border-radius:999px;color:#ffd75e;vertical-align:middle;
       text-shadow:0 0 6px rgba(255,183,71,.5)}
@@ -802,7 +808,12 @@ function show(l,auto){
   (l.sim?'<span class="simchip">\\u{1F5E3} Speak along with them</span>':"")+'</div>'+
   simRows+
   '<div id="verdict"></div>'+
-  (auto?"":'<div id="hints"><button id="wordbtn">Next Word</button> <button id="linebtn">Line</button> <button id="gotbtn">\\u2713 Got it</button></div>');
+  (auto?"":'<div id="hints"><button id="wordbtn">Next Word</button> <button id="linebtn">Line</button> <button id="gotbtn">\\u2713 Got it</button></div>')+
+  // Fix-the-text-in-place, product only: the button exists when the
+  // host app offers an edit hook. The cast site offers none — its text
+  // answers to the printed page, not the practicing actor.
+  (window.parent!==window&&parent.appEditLine
+   ?'<button id="editbtn">\\u270F\\uFE0F Edit This Line</button>':"");
  const cb=document.getElementById("ctxbtn");
  // Full Script: the whole selected run, everyone's lines in order, with
  // the actor's lines gold and the current line boxed. Rebuilt from the
@@ -828,6 +839,30 @@ function show(l,auto){
  const gb=document.getElementById("gotbtn");
  if(gb)gb.onclick=()=>{if(!running)return;judging=false;
   hush();token++;pos++;setTimeout(step,150);};
+ // Edit This Line: pause, swap the line for a textarea holding the
+ // full stored text (directions included), save through the host app
+ // so the fix lands in the book — cues, read-through, next sessions.
+ const eb=document.getElementById("editbtn");
+ if(eb)eb.onclick=()=>{
+  if(running&&!paused)pause();
+  judging=false;
+  const wrap=stage.querySelector(".mine");
+  wrap.style.display="none";eb.style.display="none";
+  const ed=document.createElement("div");
+  ed.innerHTML='<textarea id="edittext"></textarea>'+
+   '<div><button class="primary" id="editsave">Save</button> '+
+   '<button id="editcancel">Cancel</button></div>';
+  wrap.after(ed);
+  const ta=document.getElementById("edittext");
+  ta.value=l.tx!==undefined?l.tx:l.say;ta.focus();
+  const closeEd=()=>{ed.remove();wrap.style.display="";eb.style.display="";};
+  document.getElementById("editcancel").onclick=closeEd;
+  document.getElementById("editsave").onclick=()=>{
+   const res=parent.appEditLine(l.i,ta.value.trim(),NAME);
+   if(res){l.say=res.say;l.tx=res.tx;}
+   closeEd();show(l,auto);
+  };
+ };
 }
 function lightUp(text){
  const S=soundSets(norm(text).split(" "));
@@ -1447,7 +1482,11 @@ def build_play(cfg, outdir):
                     elif g["sfx"]:
                         gap.append({"s": "", "t": "", "m": NEUTRAL,
                                     "p": 1.3, "x": g["sfx"]})
+                body = s["text"]
+                if body.upper().startswith(name.upper()):
+                    body = body[len(name):]
                 rec = {"i": i, "act": s["act"], "say": s["say"],
+                       "tx": body.lstrip(" .:").strip(),
                        "l": line_id(name, s["say"]),
                        "page": s.get("page", 0),
                        "cue": cue_for(speeches, i), "gap": gap}

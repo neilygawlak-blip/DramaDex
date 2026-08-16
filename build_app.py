@@ -454,7 +454,11 @@ function dataFor(play,name){
    if(g.speaker&&g.say)gap.push({s:g.speaker,t:g.say,l:"",m:"\u{1F642}",
     p:paceOf(g.text),x:g.sfx});
    else if(g.sfx)gap.push({s:"",t:"",m:"\u{1F642}",p:1.3,x:g.sfx});}
-  const rec={i,act:s.act,say:s.say,l:"",page:0,cue:cueFor(sp,i),gap};
+  let body=s.text;
+  if(body.toUpperCase().startsWith(name.toUpperCase()))
+   body=body.slice(name.length);
+  const rec={i,act:s.act,say:s.say,tx:body.replace(/^[ .:]+/,"").trim(),
+   l:"",page:0,cue:cueFor(sp,i),gap};
   if(s.gid)rec.sim=sp.filter(g=>g.gid===s.gid&&g!==s)
    .map(g=>({s:g.speaker,t:g.say,l:"",m:"\u{1F642}"}));
   lines.push(rec);prev=i;
@@ -757,6 +761,19 @@ function mount(html){
  $("stage").srcdoc=html;
 }
 window.appBack=()=>{ $("stagewrap").style.display="none";$("stage").srcdoc="";};
+// Edit This Line, called from inside the practice iframe. The fix
+// lands in the stored play — the book — so cues, the read-through and
+// every later session inherit it.
+window.appEditLine=(speechIdx,newBody,who)=>{
+ if(!current)return null;
+ const sp=current.speeches[speechIdx];
+ if(!sp||sp.speaker!==who||!newBody)return null;
+ sp.text=sp.speaker+". "+newBody;
+ sp.say=spoken(sp.text,sp.speaker);
+ current.loose=looseWords(current.speeches);
+ store.save(current);
+ return{say:sp.say,tx:newBody};
+};
 function openPractice(name,avatar){
  const data=dataFor(current,name);
  mount(PRACTICE_T
