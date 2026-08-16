@@ -88,6 +88,40 @@ for p in paras[:60]:
     pdf.ln(2.5)
 pdf.output(os.path.join(OUT, "screenplay.pdf"))
 
+# --- brackets.pdf: Gutenberg-style [square bracket] directions ---
+pdf = new_pdf("helvetica", 11)
+for p in paras:
+    b = re.sub(r"\(([^)]*)\)", r"[\1]", p)
+    pdf.multi_cell(0, 5.2, b.encode("latin-1", "replace").decode("latin-1"))
+    pdf.ln(2.5)
+pdf.output(os.path.join(OUT, "brackets.pdf"))
+
+# --- ownline.pdf: the name alone on its own centered line, dialogue
+# below, no punctuation after the name (Final Draft & friends) ---
+pdf = new_pdf("courier", 11)
+for p in paras:
+    m = re.match(r"^([A-Z][A-Z ]{2,24}?):\s*(.*)$", p)
+    if m:
+        pdf.cell(0, 5, m.group(1), align="C", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(0, 5, m.group(2))
+    else:
+        pdf.multi_cell(0, 5, p)
+    pdf.ln(2.5)
+pdf.output(os.path.join(OUT, "ownline.pdf"))
+
+# --- mixedcase.pdf: older-edition style, "Mr. Henderson. dialogue" ---
+RENAME = {"COUNTY ATTORNEY": "Mr. Henderson", "SHERIFF": "Mr. Peters",
+          "HALE": "Mr. Hale", "MRS PETERS": "Mrs. Peters",
+          "MRS HALE": "Mrs. Hale"}
+pdf = new_pdf("helvetica", 11)
+for p in paras:
+    m = re.match(r"^([A-Z][A-Z ]{2,24}?):\s*(.*)$", p)
+    if m and m.group(1) in RENAME:
+        p = RENAME[m.group(1)] + ". " + m.group(2)
+    pdf.multi_cell(0, 5.2, p.encode("latin-1", "replace").decode("latin-1"))
+    pdf.ln(2.5)
+pdf.output(os.path.join(OUT, "mixedcase.pdf"))
+
 # --- scanned.pdf: image-only, from real page photos (local only) ---
 pages_dir = os.path.join("private", "pages")
 if os.path.isdir(pages_dir):

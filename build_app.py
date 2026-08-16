@@ -226,19 +226,55 @@ const SFX_LIST=[["doorbell",/DOORBELL|DOOR-?BELL/i],["phone",/PHONE RINGS|TELEPH
 // into one paragraph. When that shape is detected, paragraphs restart
 // at every speaker-looking line, direction, or heading instead.
 const LINE_SPEAKER=/^\s*(?:OS\s+)?[A-Z][A-Z .'&/-]{1,24}?\s*(?:\([^)]*\))?\s*[:.]\s/;
+// Titled mixed-case speakers ("Mrs. Peters. dialogue") also start
+// speeches; PDFs give us no blank lines, so the reflow must know them.
+const MIXED_LINE=/^(?:Mr|Mrs|Miss|Ms|Dr|Sir|Lady|Lord|Captain|Sergeant|Major|Colonel|Rev)\.?\s+[A-Z][a-zA-Z'-]+\s*(?:\([^)]*\))?\s*[:.]\s/;
 function paragraphs(text){
  const blank=text.split(/\n\s*\n/).map(p=>p.replace(/\s+/g," ").trim()).filter(Boolean);
  const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
- const speakerLines=lines.filter(l=>LINE_SPEAKER.test(l)).length;
- if(blank.length>=speakerLines*0.8||speakerLines<4)return blank;
+ const isNameLine=l=>NAME_ONLY.test(l)&&!HEAD_RE.test(l)&&!ACT_RE.test(l);
+ const isSpeaker=l=>LINE_SPEAKER.test(l)||MIXED_LINE.test(l);
+ const speakerLines=lines.filter(isSpeaker).length;
+ const nameLines=lines.filter(isNameLine).length;
+ if(blank.length>=Math.max(speakerLines,nameLines)*0.8
+   ||(speakerLines<4&&nameLines<8))return blank;
  const out=[];let cur="";
  const push=()=>{if(cur.trim())out.push(cur.replace(/\s+/g," ").trim());cur="";};
  lines.forEach(l=>{
   if(/^\d{1,4}$/.test(l))return;              // stray page numbers
-  if(LINE_SPEAKER.test(l)||l.startsWith("(")||ACT_RE.test(l)||HEAD_RE.test(l)){push();}
+  if(isNameLine(l)){
+   // A bare name line is its OWN paragraph, so the own-line merge can
+   // pair it with the speech below as "NAME. dialogue".
+   push();out.push(l);return;
+  }
+  if(isSpeaker(l)||l.startsWith("(")||ACT_RE.test(l)||HEAD_RE.test(l)){push();}
   cur+=" "+l;
  });
  push();
+ return out;
+}
+// Older editions write directions in [brackets]; fold them to parens
+// so one rule handles both everywhere downstream.
+function normalizeBrackets(text){
+ return text.replace(/\[/g,"(").replace(/\]/g,")");
+}
+// Screenplay-shaped scripts put the character name ALONE on its own
+// line (often centered, no punctuation), dialogue underneath. When
+// that shape dominates, fold each name onto its speech so the normal
+// parser sees "NAME. dialogue".
+const NAME_ONLY=/^[A-Z][A-Z .'&-]{1,23}(\s*\([^)]*\))?$/;
+function mergeOwnLineNames(paras){
+ const isName=p=>NAME_ONLY.test(p)&&!HEAD_RE.test(p)&&!ACT_RE.test(p);
+ let hits=0;
+ for(let i=0;i<paras.length-1;i++)
+  if(isName(paras[i])&&!isName(paras[i+1]))hits++;
+ if(hits<8)return paras;
+ const out=[];
+ for(let i=0;i<paras.length;i++){
+  if(isName(paras[i])&&i+1<paras.length&&!isName(paras[i+1])){
+   out.push(paras[i]+". "+paras[i+1]);i++;
+  }else out.push(paras[i]);
+ }
  return out;
 }
 // "OS ARNOLD:" / "VOICE OF ARNOLD:" mean Arnold, offstage. Fold the
@@ -264,8 +300,25 @@ function detectCast(paras){
   if(HEAD_RE.test(n)||n.length<2)return;
   counts[n]=(counts[n]||0)+1;
  });
- return Object.entries(counts).filter(([n,c])=>c>=2)
+ let cands=Object.entries(counts).filter(([n,c])=>c>=2)
   .sort((a,b)=>b[1]-a[1]).map(([n,c])=>({name:n,count:c}));
+ if(cands.length>=2)return cands;
+ // Mixed-case editions ("Mr. White. dialogue", "Herbert: ..."): vote
+ // on paragraph-start tokens that read as names — title-prefixed, or
+ // a capitalized word that is NOT common English (the same word list
+ // the leeway uses). Three appearances make a character.
+ const TITLE=/^(Mr|Mrs|Miss|Ms|Dr|Sir|Lady|Lord|Captain|Sergeant|Major|Colonel|Rev)\b/;
+ const c2={};
+ paras.forEach(p=>{
+  const m=p.match(/^((?:Mr|Mrs|Miss|Ms|Dr|Sir|Lady|Lord|Captain|Sergeant|Major|Colonel|Rev)\.?\s+[A-Z][a-zA-Z'-]+|[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*(\([^)]*\))?\s*[:.]\s/);
+  if(!m)return;
+  const n=m[1].replace(/\s+/g," ");
+  if(!TITLE.test(n)&&COMMON.has(n.split(" ")[0].toLowerCase()))return;
+  c2[n]=(c2[n]||0)+1;
+ });
+ const extra=Object.entries(c2).filter(([n,c])=>c>=3)
+  .sort((a,b)=>b[1]-a[1]).map(([name,count])=>({name,count}));
+ return extra.length>=2?extra:cands;
 }
 function speechRe(cast){
  const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
@@ -567,12 +620,13 @@ $("srcnext").onclick=()=>{
  const pasted=$("wpaste").value.trim();
  const text=pasted||wiz.text;
  if(!text)return;
- wiz.paras=normalizeOffstage(paragraphs(text));
+ wiz.paras=normalizeOffstage(mergeOwnLineNames(
+  paragraphs(normalizeBrackets(text))));
  wiz.castGuess=detectCast(wiz.paras);
  // OCR sometimes spaces a name out ("KRIST I N"): a candidate whose
  // letters match a stronger candidate's letters is the same person.
  // Fold it — rewrite its paragraphs and merge the counts.
- const compact=n=>n.replace(/[^A-Z]/g,"");
+ const compact=n=>n.toUpperCase().replace(/[^A-Z]/g,"");
  const keep=[];
  wiz.castGuess.forEach(c=>{
   const twin=keep.find(b=>compact(b.name)===compact(c.name));
