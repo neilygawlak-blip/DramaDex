@@ -488,7 +488,10 @@ $("wpdf").onchange=async()=>{
     const vp=pg.getViewport({scale:Math.min(2,2000/vp1.width)});
     const cv=document.createElement("canvas");
     cv.width=vp.width;cv.height=vp.height;
-    await pg.render({canvasContext:cv.getContext("2d"),viewport:vp}).promise;
+    // intent:"print" renders without waiting on animation frames, so
+    // the OCR keeps working when the tab is backgrounded mid-import.
+    await pg.render({canvasContext:cv.getContext("2d"),viewport:vp,
+     intent:"print"}).promise;
     const{data}=await worker.recognize(cv);
     pages.push(data.text);
     fill.style.width=Math.round(i/doc.numPages*100)+"%";
