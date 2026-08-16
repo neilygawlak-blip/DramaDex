@@ -120,6 +120,37 @@ INT_SFX = [
     ("phone", re.compile(r"[Pp]hone rings|phone buzzes")),
 ]
 
+# The ~10k most common English words (public-domain frequency data,
+# english10k.txt). A spoken word NOT on this list — Tovarisch, ingénue,
+# Colville — is one the recognizer will probably mangle, so it earns a
+# small, bounded fuzzy allowance in the comparator. Only those words;
+# ordinary English stays exactly as strict as it is.
+_common = None
+
+
+def common_words():
+    global _common
+    if _common is None:
+        _common = {w.strip() for w in
+                   open("english10k.txt", encoding="utf-8") if w.strip()}
+    return _common
+
+
+def loose_words(speeches):
+    import unicodedata
+    common = common_words()
+    out = set()
+    for s in speeches:
+        if not s["say"]:
+            continue
+        t = unicodedata.normalize("NFD", s["say"])
+        t = t.encode("ascii", "ignore").decode().lower()
+        for w in re.findall(r"[a-z]+", t):
+            if len(w) >= 4 and w not in common:
+                out.add(w)
+    return sorted(out)
+
+
 def line_id(speaker, say):
     """Stable id for a spoken line: changes only when the words change.
     Keys the pre-rendered real-voice clips (voices/<CHAR>/<id>.mp3), so a
@@ -511,6 +542,10 @@ just speak when it's your turn.</div>
 <script>
 const DATA=__DATA__;
 const NAME="__NAME__";
+// Words this play uses that common English does not (names, foreign
+// exclamations, theater exotica). ONLY these get the bounded fuzzy
+// allowance below; everything else keeps the strict rules.
+const LOOSE=new Set(DATA.loose||[]);
 // ---- scope menu: whole play, acts, scene-runs ----
 const scope=document.getElementById("scope");
 function buildScope(){
@@ -647,10 +682,22 @@ function canon(w){
 // near-nothing phonetically and would match anything.
 function soundSets(H){
  H=H.map(canon);
- return {hset:new Set(H),pset:new Set(H.map(pkey).filter(k=>k.length>1))};
+ // joins: recognizers split foreign words ("to varish"); adjacent
+ // pairs joined let a flagged word match its own two halves.
+ const joins=[];
+ for(let i=0;i<H.length-1;i++)joins.push(H[i]+H[i+1]);
+ return {hset:new Set(H),pset:new Set(H.map(pkey).filter(k=>k.length>1)),
+  hlist:H,joins};
 }
 const wordOk=(w,S)=>{w=canon(w);
- return S.hset.has(w)||(w.length>2&&S.pset.has(pkey(w)));};
+ if(S.hset.has(w)||(w.length>2&&S.pset.has(pkey(w))))return true;
+ // The bounded allowance, for flagged words only: off by one letter
+ // (4-5 letters) or two (6+), against heard words or joined pairs.
+ if(!LOOSE.has(w))return false;
+ const tol=w.length>=6?2:w.length>=4?1:0;
+ if(!tol)return false;
+ const near=h=>Math.abs(h.length-w.length)<=tol&&lev(h,w)<=tol;
+ return S.hlist.some(near)||S.joins.some(near);};
 function grade(expected,heard){
  const E=norm(expected).split(" ").filter(w=>w),H=norm(heard).split(" ").filter(w=>!FILLERS.has(w));
  const S=soundSets(H);let hit=0;const marks=E.map(w=>{const ok=wordOk(w,S);if(ok)hit++;return {w,ok};});
@@ -910,9 +957,13 @@ function doneEnough(l){
  // anywhere in the transcript let a mid-line stall advance the run the
  // moment an earlier word resembled the ending.
  const last=canon(E[E.length-1]);
- const tol=last.length>=5?1:0;
- const endsRight=H.slice(-2).map(canon).some(h=>h===last||(tol&&lev(h,last)<=tol)
+ const tol=LOOSE.has(last)?(last.length>=6?2:1):(last.length>=5?1:0);
+ const tail=H.slice(-2).map(canon);
+ let endsRight=tail.some(h=>h===last||(tol&&lev(h,last)<=tol)
   ||(last.length>2&&pkey(h)===pkey(last)));
+ // A flagged final word may also arrive split in two ("to varish").
+ if(!endsRight&&LOOSE.has(last)&&tail.length===2)
+  endsRight=lev(tail.join(""),last)<=tol;
  if(!endsRight)return false;
  // A repeated word must not end the line early: "WE will get it ...
  // what is it?" says "it" at word four. The ending only counts once
@@ -1368,8 +1419,10 @@ def build_play(cfg, outdir):
     cast = [l.strip() for l in open(cfg["cast"], encoding="utf-8-sig")
             if l.strip()]
     speeches = parse(cfg["raw"], cast, cfg)
+    loose = loose_words(speeches)
     os.makedirs(outdir, exist_ok=True)
-    print("== %s — by %s ==" % (cfg["title"], cfg["author"]))
+    print("== %s — by %s == (%d loose words get bounded leeway)"
+          % (cfg["title"], cfg["author"], len(loose)))
 
     for name in cast:
         if name in cfg["no_page"]:
@@ -1411,7 +1464,7 @@ def build_play(cfg, outdir):
             continue
         runs = runs_for(speeches, name)
         data = {"lines": lines, "runs": runs, "voices": cfg["voices"],
-                "avatars": cfg["avatars"]}
+                "avatars": cfg["avatars"], "loose": loose}
         build = datetime.datetime.now().strftime("%b %d, %I:%M %p")
         html = (TEMPLATE
                 .replace("__AVATAR__", cfg["avatars"].get(name, ""))

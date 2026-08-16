@@ -183,6 +183,19 @@ APP = r"""<!DOCTYPE html>
 "use strict";
 const PRACTICE_T=__PRACTICE_T__;
 const READ_T=__READ_T__;
+// ~10k most common English words. A script word not on this list gets
+// a small bounded fuzzy allowance in grading (names, foreign words).
+const COMMON=new Set(__COMMON__);
+function looseWords(speeches){
+ const out=new Set();
+ speeches.forEach(s=>{
+  if(!s.say)return;
+  const t=s.say.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+  (t.match(/[a-z]+/g)||[]).forEach(w=>{
+   if(w.length>=4&&!COMMON.has(w))out.add(w);});
+ });
+ return [...out].sort();
+}
 
 // ---------- storage ----------
 const DB="dramadex_plays";
@@ -393,7 +406,7 @@ function dataFor(play,name){
    .map(g=>({s:g.speaker,t:g.say,l:"",m:"\u{1F642}"}));
   lines.push(rec);prev=i;
  });
- return{lines,runs:runsFor(sp,name),voices,avatars};
+ return{lines,runs:runsFor(sp,name),voices,avatars,loose:play.loose||[]};
 }
 function readData(play){
  const items=[];const sp=play.speeches;
@@ -616,7 +629,7 @@ function nextTriage(){
 function finishImport(){
  const speeches=buildSpeeches(wiz.classified,wiz.cast.map(c=>c.name));
  const play={id:wiz.id,title:wiz.title,author:wiz.author,created:Date.now(),
-  cast:wiz.cast,speeches};
+  cast:wiz.cast,speeches,loose:looseWords(speeches)};
  store.save(play);
  const n=speeches.filter(s=>s.speaker&&s.say).length;
  const skipped=wiz.classified.filter(c=>c.k==="front").length;
@@ -688,9 +701,12 @@ def main():
     # "</script>" inside the embedded template strings would terminate
     # the app's own script tag mid-string.
     js_str = lambda s: json.dumps(s).replace("</", "<\\/")
+    common = [w.strip() for w in open("english10k.txt", encoding="utf-8")
+              if w.strip()]
     out = (APP
            .replace("__PRACTICE_T__", js_str(practice))
-           .replace("__READ_T__", js_str(read)))
+           .replace("__READ_T__", js_str(read))
+           .replace("__COMMON__", json.dumps(common)))
     os.makedirs("app", exist_ok=True)
     with open(os.path.join("app", "index.html"), "w",
               encoding="utf-8") as fh:
