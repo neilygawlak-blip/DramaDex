@@ -506,11 +506,25 @@ $("wpdf").onchange=async()=>{
   const all=[];
   for(let i=1;i<=doc.numPages;i++){
    const tc=await(await doc.getPage(i)).getTextContent();
-   // The PDF's text items carry their own spaces as separate items;
-   // inserting one after every fragment shattered contractions
-   // ("I'd" -> "I ' d"). Join plain, newline only at end-of-line.
-   let page="";
-   tc.items.forEach(it=>{page+=it.str+(it.hasEOL?"\n":"");});
+   // Spacing is reconstructed from GEOMETRY, the way real extractors
+   // do it: fragments touching on the page join ("th"+"r"+"ee" ->
+   // three), fragments with a real horizontal gap get a space, and a
+   // vertical jump is a new line. Trusting the PDF's own space
+   // fragments shattered words in both directions.
+   let page="",last=null;
+   for(const it of tc.items){
+    if(!it.str){last=it.width?it:last;continue;}
+    if(last){
+     const dy=Math.abs(it.transform[5]-last.transform[5]);
+     if(dy>2)page+="\n";
+     else{
+      const gap=it.transform[4]-(last.transform[4]+last.width);
+      if(gap>(it.height||10)*0.12)page+=" ";
+     }
+    }
+    page+=it.str;
+    last=it;
+   }
    all.push(page);
    log.textContent="Reading page "+i+" of "+doc.numPages+"…";
   }
