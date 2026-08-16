@@ -493,8 +493,11 @@ $("wpdf").onchange=async()=>{
   const all=[];
   for(let i=1;i<=doc.numPages;i++){
    const tc=await(await doc.getPage(i)).getTextContent();
+   // The PDF's text items carry their own spaces as separate items;
+   // inserting one after every fragment shattered contractions
+   // ("I'd" -> "I ' d"). Join plain, newline only at end-of-line.
    let page="";
-   tc.items.forEach(it=>{page+=it.str+(it.hasEOL?"\n":" ");});
+   tc.items.forEach(it=>{page+=it.str+(it.hasEOL?"\n":"");});
    all.push(page);
    log.textContent="Reading page "+i+" of "+doc.numPages+"…";
   }

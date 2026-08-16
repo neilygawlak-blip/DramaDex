@@ -591,7 +591,12 @@ function playSfx(n){if(!n)return 0;if(!AC)AC=new (window.AudioContext||window.we
   :n==="voices"?1500:n==="sing"?1400:n==="scream"?1000:n==="gasp"?600:1200;}
 
 // ---- forgiving word diff, the workbench tiers ----
-const norm=s=>s.toLowerCase().replace(/[^a-z0-9' ]+/g," ").replace(/\\s+/g," ").trim();
+// Curly apostrophes fold to straight ones and accents fold to their
+// base letter BEFORE the strip: "I’d" must stay one word and
+// "ingénue" must not display as "ing nue".
+const norm=s=>s.toLowerCase().replace(/[\\u2019\\u2018]/g,"'")
+ .normalize("NFD").replace(/[\\u0300-\\u036f]/g,"")
+ .replace(/[^a-z0-9' ]+/g," ").replace(/\\s+/g," ").trim();
 const FILLERS=new Set(["er","um","uh","erm","like","well"]);
 // Phonetic key (metaphone-style consonant skeleton). The recognizer
 // mishears an accented or mumbled word as a *soundalike* real word:
