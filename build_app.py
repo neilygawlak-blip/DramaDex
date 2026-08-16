@@ -126,20 +126,16 @@ APP = r"""<!DOCTYPE html>
  <div class="step" id="step-source">
   <h2>Bring in the script</h2>
   <div class="card"><b>&#128196; PDF</b>
-   <p class="muted">A typed script as a PDF. The text is read right
-   here on the device.</p>
+   <p class="muted">Typed or scanned — both work. A scanned PDF is
+   read page by page right here on the device (this takes a minute).
+   Tip: any scanner or phone scan app can save straight to PDF.</p>
    <input type="file" id="wpdf" accept=".pdf,application/pdf">
+   <div class="bar" id="ocrbar" style="display:none"><div></div></div>
   </div>
   <div class="card"><b>&#128203; Text</b>
    <p class="muted">Paste the whole script, or pick a .txt file.</p>
    <input type="file" id="wtxt" accept=".txt,text/plain">
    <textarea id="wpaste" placeholder="LILI: Did you see him? ..."></textarea>
-  </div>
-  <div class="card"><b>&#128444; Scanned pages</b>
-   <p class="muted">Page images from a scanner, one per page, in
-   order. They're read on this device and never uploaded.</p>
-   <input type="file" id="wimgs" accept="image/*" multiple>
-   <div class="bar" id="ocrbar" style="display:none"><div></div></div>
   </div>
   <div id="ocrlog"></div>
   <button class="primary" id="srcnext" disabled>Next</button>
@@ -267,11 +263,24 @@ function sfxOf(p){
  for(const[n,rx]of SFX_LIST)if(rx.test(dirs))return n;
  return null;
 }
-// Classify every paragraph; the leftovers go to triage.
+// Classify every paragraph; only genuine mid-play ambiguity reaches
+// triage. Front matter (title page, rights notice, the character list
+// with its descriptions) and back matter (THE END, prop and costume
+// plots) are recognized and skipped for the user: the play runs from
+// its first act heading (or first scene heading, or first line of
+// dialogue) to its end marker.
+const END_RE=/^(THE END\b|END OF (THE )?PLAY|Blackout End of Play|PROPS\b|COSTUMES\b|FURNITURE PLOT|PROPERTY PLOT|EFFECTS PLOT|CURTAIN CALL)/i;
 function classify(paras,cast){
  const re=speechRe(cast);
+ let start=paras.findIndex(p=>ACT_RE.test(p));
+ if(start<0)start=paras.findIndex(p=>/^(AT RISE|SCENE|SETTING)\b/.test(p));
+ if(start<0)start=paras.findIndex(p=>re.test(p));
+ if(start<0)start=0;
+ let end=paras.findIndex((p,i)=>i>start&&END_RE.test(p));
+ if(end<0)end=paras.length;
  const out=[];
- paras.forEach(p=>{
+ paras.forEach((p,idx)=>{
+  if(idx<start||idx>=end){out.push({k:"front",p});return;}
   if(ACT_RE.test(p)){out.push({k:"act",p});return;}
   if(HEAD_RE.test(p)){out.push({k:"head",p});return;}
   if(re.test(p)){out.push({k:"sp",p});return;}
@@ -287,7 +296,7 @@ function buildSpeeches(classified,cast){
  const re=speechRe(cast);
  let act="Front matter";const speeches=[];
  classified.forEach(c=>{
-  if(c.k==="drop")return;
+  if(c.k==="drop"||c.k==="front")return;
   if(c.k==="act"){const m=c.p.match(ACT_RE);act=ACT_NAMES[m[1]]||"Act I";return;}
   if(c.k==="head")return;
   const p=c.k==="dirform"?"("+c.p+")":c.p;
@@ -413,9 +422,10 @@ function renderShelf(){
 
 // ---------- wizard ----------
 let wiz=null;
-$("newbtn").onclick=()=>{wiz={id:String(Date.now()),pages:[],text:""};
+$("newbtn").onclick=()=>{wiz={id:String(Date.now()),text:""};
  $("wtitle").value="";$("wauthor").value="";$("wpaste").value="";
- $("wimgs").value="";$("ocrlog").textContent="";$("srcnext").disabled=true;
+ $("wpdf").value="";$("wtxt").value="";
+ $("ocrlog").textContent="";$("srcnext").disabled=true;
  show("wizard");step("title");};
 ["wcancel1","wcancel2","wcancel3"].forEach(id=>$(id).onclick=()=>{show("home");renderShelf();});
 $("titlenext").onclick=()=>{
@@ -438,28 +448,6 @@ function loadTesseract(){
  });
  return tessReady;
 }
-$("wimgs").onchange=async()=>{
- const files=[...$("wimgs").files];
- if(!files.length)return;
- const bar=$("ocrbar");bar.style.display="";const fill=bar.firstElementChild;
- const log=$("ocrlog");
- try{
-  await loadTesseract();
-  const worker=await Tesseract.createWorker("eng");
-  let all=[];
-  for(let i=0;i<files.length;i++){
-   log.textContent="Reading page "+(i+1)+" of "+files.length+"…\n"+log.textContent;
-   const{data}=await worker.recognize(files[i]);
-   all.push(data.text);
-   fill.style.width=Math.round((i+1)/files.length*100)+"%";
-  }
-  await worker.terminate();
-  wiz.text=all.join("\n\n");
-  log.textContent="Read "+files.length+" page(s). "+
-   wiz.text.split(/\s+/).length+" words.\n"+log.textContent;
-  $("srcnext").disabled=false;
- }catch(e){log.textContent="⚠ "+e.message+"\n"+log.textContent;}
-};
 $("wtxt").onchange=async()=>{
  const f=$("wtxt").files[0];if(!f)return;
  wiz.text=await f.text();
@@ -484,6 +472,7 @@ function loadPdfjs(){
 $("wpdf").onchange=async()=>{
  const f=$("wpdf").files[0];if(!f)return;
  const log=$("ocrlog");
+ const bar=$("ocrbar"),fill=bar.firstElementChild;
  try{
   await loadPdfjs();
   const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
@@ -495,15 +484,36 @@ $("wpdf").onchange=async()=>{
    all.push(page);
    log.textContent="Reading page "+i+" of "+doc.numPages+"…";
   }
-  wiz.text=all.join("\n\n");
-  if(wiz.text.replace(/\s/g,"").length<80){
-   log.textContent="⚠ Almost no text in this PDF — it's probably a "+
-    "scan. Export the pages as images and use Scanned pages instead.";
-  }else{
-   log.textContent="Read "+doc.numPages+" PDF pages, "+
-    wiz.text.split(/\s+/).length+" words.";
-   $("srcnext").disabled=false;
+  let text=all.join("\n\n");
+  if(text.replace(/\s/g,"").length<80){
+   // No text layer: a scanned PDF. Render each page and read it
+   // right here — slower, but nothing ever leaves the device.
+   log.textContent="This PDF is a scan — reading it page by page…";
+   await loadTesseract();
+   const worker=await Tesseract.createWorker("eng");
+   bar.style.display="";
+   const pages=[];
+   for(let i=1;i<=doc.numPages;i++){
+    const pg=await doc.getPage(i);
+    // Render around 2000px wide: enough detail for OCR, without
+    // building a monster canvas from a high-res phone scan.
+    const vp1=pg.getViewport({scale:1});
+    const vp=pg.getViewport({scale:Math.min(2,2000/vp1.width)});
+    const cv=document.createElement("canvas");
+    cv.width=vp.width;cv.height=vp.height;
+    await pg.render({canvasContext:cv.getContext("2d"),viewport:vp}).promise;
+    const{data}=await worker.recognize(cv);
+    pages.push(data.text);
+    fill.style.width=Math.round(i/doc.numPages*100)+"%";
+    log.textContent="Read page "+i+" of "+doc.numPages+"…";
+   }
+   await worker.terminate();
+   text=pages.join("\n\n");
   }
+  wiz.text=text;
+  log.textContent="Read "+doc.numPages+" pages, "+
+   text.split(/\s+/).length+" words.";
+  $("srcnext").disabled=false;
  }catch(e){log.textContent="⚠ "+e.message;}
 };
 $("srcnext").onclick=()=>{
@@ -576,9 +586,11 @@ function finishImport(){
   cast:wiz.cast,speeches};
  store.save(play);
  const n=speeches.filter(s=>s.speaker&&s.say).length;
+ const skipped=wiz.classified.filter(c=>c.k==="front").length;
  $("donesummary").textContent=wiz.title+": "+wiz.cast.length+
   " characters, "+n+" spoken lines, "+
-  [...new Set(speeches.map(s=>s.act))].filter(a=>a!=="Front matter").length+" act(s).";
+  [...new Set(speeches.map(s=>s.act))].filter(a=>a!=="Front matter").length+" act(s)."+
+  (skipped?" ("+skipped+" front/back-matter paragraphs skipped for you.)":"");
  step("done");
  $("donebtn").onclick=()=>openPlay(play.id);
 }
