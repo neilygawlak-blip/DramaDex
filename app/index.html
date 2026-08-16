@@ -554,8 +554,18 @@ $("castnext").onclick=()=>{
  if(!cast.length)return;
  wiz.cast=cast;
  wiz.classified=classify(wiz.paras,cast.map(c=>c.name));
- wiz.queue=wiz.classified.filter(c=>c.k==="orphan");
- nextTriage();
+ // No questions (Chris's call): stragglers are auto-filed with the
+ // best-guess rule — reads like the tail of the previous speech, it's
+ // stitched on; otherwise it's a stage direction. The done screen says
+ // how many were filed.
+ wiz.autoFiled=0;
+ wiz.classified.forEach((c,i)=>{
+  if(c.k!=="orphan")return;
+  const prev=wiz.classified[i-1];
+  c.k=(prev&&prev.k==="sp"&&/^[a-z]/.test(c.p))?"stitch":"dirform";
+  wiz.autoFiled++;
+ });
+ finishImport();
 };
 function nextTriage(){
  if(!wiz.queue.length){finishImport();return;}
@@ -593,7 +603,9 @@ function finishImport(){
  $("donesummary").textContent=wiz.title+": "+wiz.cast.length+
   " characters, "+n+" spoken lines, "+
   [...new Set(speeches.map(s=>s.act))].filter(a=>a!=="Front matter").length+" act(s)."+
-  (skipped?" ("+skipped+" front/back-matter paragraphs skipped for you.)":"");
+  (skipped?" "+skipped+" front/back-matter paragraphs skipped.":"")+
+  (wiz.autoFiled?" "+wiz.autoFiled+" odd paragraph"+
+   (wiz.autoFiled>1?"s":"")+" auto-filed.":"");
  step("done");
  $("donebtn").onclick=()=>openPlay(play.id);
 }
@@ -624,8 +636,7 @@ function openPlay(id){
 }
 $("pvback").onclick=()=>{show("home");renderShelf();};
 $("pvdelete").onclick=()=>{
- if(confirm("Delete “"+current.title+"” from this device?")){
-  store.del(current.id);show("home");renderShelf();}
+ store.del(current.id);show("home");renderShelf();
 };
 function mount(html){
  $("stagewrap").style.display="block";
