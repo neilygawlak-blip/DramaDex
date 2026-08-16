@@ -143,13 +143,13 @@ APP = r"""<!DOCTYPE html>
  </div>
 
  <div class="step" id="step-cast">
-  <h2>Who's in it?</h2>
-  <p class="muted">These names start lines in your script. Untick
-  anything that isn't a character. The emoji is your call.</p>
+  <h2>Are these all the characters?</h2>
+  <p class="muted">Found in your script. Untick anything that isn't a
+  character; add anyone missing. The emoji is your call.</p>
   <div id="castlist"></div>
-  <input type="text" id="addcast" placeholder="Add a missing character name">
+  <input type="text" id="addcast" placeholder="Add a missing character name (optional)">
   <button id="addcastbtn">Add</button>
-  <div><button class="primary" id="castnext">Next</button>
+  <div><button class="primary" id="castnext">Yes, that's everyone</button>
   <button id="wcancel3">Cancel</button></div>
  </div>
 
@@ -228,6 +228,20 @@ function paragraphs(text){
  push();
  return out;
 }
+// "OS ARNOLD:" / "VOICE OF ARNOLD:" mean Arnold, offstage. Fold the
+// prefix into a direction so the same character never splits in two.
+const OS_RE=/^((?:OS|O\.S\.|OFFSTAGE|VOICE OF)\s+)([A-Z][A-Z .'&-]{1,24}?\s*[:.])/;
+function normalizeOffstage(paras){
+ return paras.map(p=>{
+  const m=p.match(OS_RE);
+  if(!m)return p;
+  return p.replace(OS_RE,(a,pre,name)=>name.replace(/\s*([:.])$/," (off)$1"));
+ });
+}
+// Generic stage vocabulary that LOOKS like a speaker but usually
+// isn't a practicable character: suggested unticked, user's call.
+const GENERIC=new Set(["VOICE","VOICES","ALL","BOTH","EVERYONE","OMNES",
+ "CROWD","OFFSTAGE","OS","TOGETHER"]);
 function detectCast(paras){
  const counts={};
  paras.forEach(p=>{
@@ -520,16 +534,32 @@ $("srcnext").onclick=()=>{
  const pasted=$("wpaste").value.trim();
  const text=pasted||wiz.text;
  if(!text)return;
- wiz.paras=paragraphs(text);
+ wiz.paras=normalizeOffstage(paragraphs(text));
  wiz.castGuess=detectCast(wiz.paras);
+ // OCR sometimes spaces a name out ("KRIST I N"): a candidate whose
+ // letters match a stronger candidate's letters is the same person.
+ // Fold it — rewrite its paragraphs and merge the counts.
+ const compact=n=>n.replace(/[^A-Z]/g,"");
+ const keep=[];
+ wiz.castGuess.forEach(c=>{
+  const twin=keep.find(b=>compact(b.name)===compact(c.name));
+  if(twin){
+   const rx=new RegExp("^"+c.name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"));
+   wiz.paras=wiz.paras.map(p=>rx.test(p)?p.replace(rx,twin.name):p);
+   twin.count+=c.count;
+  }else keep.push(c);
+ });
+ wiz.castGuess=keep;
  renderCast();step("cast");
 };
 function renderCast(){
  const el=$("castlist");el.innerHTML="";
  wiz.castGuess.forEach((c,i)=>{
   const row=document.createElement("div");row.className="castrow";
-  row.innerHTML='<input type="checkbox" checked data-i="'+i+'">'+
-   '<b>'+esc(c.name)+'</b><small>'+c.count+' lines</small>'+
+  const on=GENERIC.has(c.name)?"":" checked";
+  row.innerHTML='<input type="checkbox"'+on+' data-i="'+i+'">'+
+   '<b>'+esc(c.name)+'</b><small>'+c.count+' lines'+
+   (on?"":" · probably not a character")+'</small>'+
    '<input type="text" maxlength="4" placeholder="emoji" data-e="'+i+'">';
   el.appendChild(row);
  });
