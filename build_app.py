@@ -645,6 +645,9 @@ function finishImport(){
 let current=null;
 function openPlay(id){
  current=store.get(id);if(!current){show("home");renderShelf();return;}
+ // Plays imported before the loose-word feature self-heal here.
+ if(!current.loose){current.loose=looseWords(current.speeches);
+  store.save(current);}
  $("pvtitle").textContent="\u{1F3AD} "+current.title;
  $("pvauthor").textContent=current.author?"by "+current.author:"";
  const el=$("pvcast");el.innerHTML="";
