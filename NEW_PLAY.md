@@ -147,3 +147,66 @@ by the prompts above — for the next play, run the same prompts (the
 per-play AI help Chris expects "behind the scenes at first"). The
 long-term product replaces those passes with the concierge import
 pipeline, which is exactly what the alpha plan always said.
+
+---
+
+## What the third play taught (Communicating Doors, 2026-10-30)
+
+Chris photographed the Samuel French edition as two-page spreads with the
+iPhone Files scanner, three PDFs, 56 spreads, pages 7-112, and the play went
+from PDFs to a cue-clean fixed text in one sitting. Everything lives in
+`private/communicating_doors/`, one folder per play as Phase 6 asked. What
+was new, in the order it bit:
+
+1. **Spreads from the phone come out sideways, and not all the same way.**
+   The scanner saves the photo as held, so the spine ran across the picture,
+   and ten spreads in the middle were turned the opposite way. `split_spreads.py`
+   decides orientation once per batch and cut these down the wrong axis. The
+   fix that worked: OCR a 1400 px thumbnail of each spread at both turns and
+   keep the turn that reads more dictionary words (`english10k.txt`). Ten
+   spreads read zero words either way; those were the upside-down ones, settled
+   by a second vote between 0 and 180 degrees.
+2. **The fold is where no text crosses, not where the shadow is.** The shadow
+   finder landed at 61% of the width on most spreads (the hand and page edge
+   are darker than the gutter) and clipped the first inch off every right-hand
+   page. Using the OCR line boxes from the orientation vote, the fold is the
+   widest vertical band in the middle 40% that no line crosses. That put every
+   cut within a few px of the real gutter.
+3. **Name the pages by PRINTED number before OCR.** File page N was printed
+   page N+1 (the first spread was the copyright page). Four pages had their
+   number read; the offset was constant; everything downstream then quotes a
+   printed page.
+4. **Thumbs at the gutter eat words.** Seven pages lost a word or a speaker
+   tag under the thumb holding the spine; `communicating_doors_retakes.txt`
+   lists them. A skin-colour scan over the text column finds the pages, but
+   the OCR line boxes find them better: a line whose box starts well inside
+   the margin or ends early is the tell. Added to SCANNING_GUIDE.md.
+5. **Windows OCR drops short wrap-around lines whole.** "we?", "it—?", "...",
+   "moon—", a six-word tail: gone without a trace. Found by line pitch: a gap
+   of 1.6-4 pitches between two OCR lines where the first does not end in
+   punctuation. Twenty-four candidates, six real, each read off a crop of the
+   gap and put back by hand. Re-OCR of the gap strip did not work; eyes did.
+6. **The italic directions are where the damage is.** Roman dialogue read
+   nearly clean; italic m became tn/nt/rn, Th became fi/ft/fl/n, spaces vanished
+   (POOPAYfollows, artificialfurcoat), "ooh" became "001)" and unbalanced a
+   paren. `polish_ocr_text.py` fixed 81 and got six wrong (anns->anus for
+   small arms fire, ftank->flank for Thank, lier->tier for her), so its log is
+   read, not trusted. The per-play dictionary in
+   `communicating_doors_global_fixes.py` is the record.
+7. **Speaker tags welded to the end of the previous speech**, 106 of them
+   ("You know who you remind me of? POOPAY Who?"), because the OCR put a short
+   speech on the same line as the speech above. Split at a cast name outside
+   parentheses followed by a capital, a paren or an ellipsis; never at
+   "NAME's", never at "and NAME" / ", NAME" (joint speeches), and only after
+   multi-paragraph directions have been rejoined by paren depth, or the cut
+   lands inside a direction.
+8. **Every speakerless paragraph was a continuation**, 139 of them, none a
+   lost tag: the Samuel French page indents a speech's first line and sets the
+   rest flush left, so the assembler broke speeches at sentence starts.
+   `build_fix_table.py` writes the STITCH entries from that rule plus a hand
+   list; `apply_fixes.py` applies them and expands joint speeches of any size
+   ("RUELLA, JESSICA and POOPAY (together, triumphantly). Yes! Yes! Yes!").
+9. **Check the printed oddities before "fixing" them.** "Shine." (p.43),
+   "migor rortis" (p.76) and "What the does that mean?" (p.104) are all
+   printed exactly so. A crop of the line costs almost nothing; a wrong fix
+   costs an actor a laugh.
