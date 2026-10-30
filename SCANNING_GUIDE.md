@@ -16,11 +16,13 @@ a minute a page, and you only do it once per script.
 - **One printed page per picture.** Never a two-page spread. Two pages in
   one picture get read as one wide page and the lines interleave.
 - **Keep the page number in the shot.** Everything downstream uses it.
-- **Thumbs off the inner margin.** A thumb holding the page down at the
-  spine covers the first or last word of a line, and that word is gone for
-  good. Hold the page by its outer edge, or weigh the far page down with a
-  mug or a card. On the first Communicating Doors scan this cost seven
-  pages a re-shoot.
+- **Thumbs off the text, both margins.** A thumb holding the page down at
+  the spine covers the first or last word of a line, and that word is gone
+  for good. A thumb on the outer edge does the same to the other end of the
+  line. Hold the page below the last line of print, or weigh it down with a
+  mug or a card. On the first Communicating Doors scan this cost eight pages
+  a re-shoot, and the re-shoot had to be read against the first photos
+  because the thumb had moved to the other margin.
 - **Short last lines are the easiest thing to lose.** A line that is just
   "we?" or "it—?" can be missed by the reader entirely. Nothing to do
   while shooting, but it is why the build checks line spacing afterwards.

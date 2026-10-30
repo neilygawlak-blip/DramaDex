@@ -210,3 +210,12 @@ was new, in the order it bit:
    "migor rortis" (p.76) and "What the does that mean?" (p.104) are all
    printed exactly so. A crop of the line costs almost nothing; a wrong fix
    costs an actor a laugh.
+10. **A retake moves the thumb, it does not remove it.** The eight re-shot
+   pages came back as spreads held by the outer edge, so the thumb now sat on
+   the far end of the same lines. Six pages read clean; two were read by
+   laying the first photo and the retake side by side, each hiding a different
+   half of the line. Retake fixes go in a `RETAKES_read.txt` with the same FIX
+   rows as a character read-through, so the regenerated `read_fixes.tsv`
+   carries them and nothing is edited by hand in the TSV. And a stray
+   fragment on the OCR line of a hidden word ("is," for "this, he") is not a
+   missing word: check whether the next page opens mid-sentence first.
