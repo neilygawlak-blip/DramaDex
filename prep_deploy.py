@@ -440,7 +440,7 @@ def main():
     # One cast page per play; the front page chooses between them. A
     # play's files are picked out by its prefix, so the prefixless play
     # (SHTR, whose URLs predate the chooser) claims what's left.
-    order = ["intermission", "shtr"]
+    order = ["doors", "intermission", "shtr"]
     other_prefixes = [PLAYS[k]["prefix"] for k in order if PLAYS[k]["prefix"]]
     playlinks, npages = [], 0
     for key in order:

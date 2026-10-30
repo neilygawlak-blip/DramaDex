@@ -268,6 +268,43 @@ SFX_RE = [
 ]
 
 
+# Communicating Doors (Ayckbourn, Samuel French). Two emoji each, picked to
+# render on desktop Windows; swap them when Chris casts the look.
+CD_AVATARS = {
+    "POOPAY":  "👢⛓️",     # the dominatrix: boots and chains
+    "RUELLA":  "👓📰",       # the second wife, reading glasses and the paper
+    "REECE":   "👴📜",       # the old man and his confession
+    "JESSICA": "💍🌴",       # the bride, back from the honeymoon
+    "JULIAN":  "🕴️💊", # the suit with the pills
+    "HAROLD":  "🔑🕵️", # house detective with the pass key
+    "WOMAN":   "👒🖤",       # the veiled figure in black
+    "FULL READ THROUGH": "🎧📖",
+}
+
+# Defaults until Chris casts the voices: Poopay is London and quick, the
+# Welleses and Julian are proper, Harold is plain, the Woman slow.
+CD_VOICES = {
+    "POOPAY":  {"g": "f", "style": "casual", "mult": 1.1},
+    "RUELLA":  {"g": "f", "style": "proper", "mult": 1.0},
+    "REECE":   {"g": "m", "style": "proper", "mult": 0.9},
+    "JESSICA": {"g": "f", "style": "proper", "mult": 1.05},
+    "JULIAN":  {"g": "m", "style": "proper", "mult": 1.0},
+    "HAROLD":  {"g": "m", "style": "casual", "mult": 1.0},
+    "WOMAN":   {"g": "f", "style": "proper", "mult": 0.9},
+}
+
+# Cues as the directions print them. "scream" is kept to the three printed
+# screams so dialogue about screaming never fires it; the gunfire outside the
+# window plays as the bump.
+CD_SFX = [
+    ("doorbell", re.compile(r"[Dd]oorbell (chimes|rings)")),
+    ("phone", re.compile(r"phone starts ringing")),
+    ("bump", re.compile(r"knock on the (front )?door|sound of automatic gun fire")),
+    ("slam", re.compile(r"slams the door")),
+    ("scream", re.compile(r"POOPAY starts screaming|gives a stifled scream|Both women scream")),
+]
+
+
 PLAYS = {
     "shtr": {
         "title": "See How They Run", "author": "Philip King",
@@ -287,6 +324,18 @@ PLAYS = {
         "act_pages": {"Act I": (3, 27), "Act II": (28, 51)},
         "back_matter": (), "no_page": {"VOICE"},
         "avatars": INT_AVATARS, "voices": INT_VOICES, "sfx": INT_SFX,
+    },
+    "doors": {
+        "title": "Communicating Doors", "author": "Alan Ayckbourn",
+        "raw": "private/communicating_doors/communicating_doors_fixed.txt",
+        "cast": "private/communicating_doors/cast_communicating_doors.txt",
+        "prefix": "CD_", "home": "communicating_doors.html",
+        "acts": 2,
+        # Printed pages: Act One opens on p.7 and ends on p.62, Act Two
+        # runs p.63 to the END OF PLAY on p.112.
+        "act_pages": {"Act I": (7, 62), "Act II": (63, 112)},
+        "back_matter": ("END OF PLAY",), "no_page": set(),
+        "avatars": CD_AVATARS, "voices": CD_VOICES, "sfx": CD_SFX,
     },
 }
 
