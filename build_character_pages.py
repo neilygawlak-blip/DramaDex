@@ -884,10 +884,14 @@ function show(l,auto){
   if(nxt)nxt.classList.add("show");};
  if(lb)lb.onclick=()=>stage.querySelectorAll("#diff .pending").forEach(s=>s.classList.add("show"));
  // The mic will not catch everything (Russian, mumbles, loud rooms):
- // Got it is the actor vouching for themselves, and the run moves on.
+ // Got it is the actor vouching for themselves, and it credits the line
+ // exactly as a spoken pass does (Chris, 2026-11-04): the check draws,
+ // every word lights, the ears are wiped, and the run moves on. Without
+ // the wipe the old transcript lit the whole line green the moment he
+ // arrowed back to it, so a line could never be run a second time.
  const gb=document.getElementById("gotbtn");
- if(gb)gb.onclick=()=>{if(!running)return;judging=false;
-  hush();token++;pos++;setTimeout(step,150);};
+ if(gb)gb.onclick=()=>{if(!running)return;
+  hush();token++;freshEars();judged(l,l.say);};
  // Edit This Line: pause, swap the line for a textarea holding the
  // full stored text (directions included), save through the host app
  // so the fix lands in the book — cues, read-through, next sessions.
@@ -1077,7 +1081,10 @@ function start(q){
 function stop(){running=false;unlockWake();startbtn.style.display="";pausebtn.style.display="none";
  prevbtn.style.display="none";nextbtn.style.display="none";
  if(rec){rec.onend=null;rec.stop();rec=null;}}
-function jump(d){if(!running)return;hush();judging=false;
+// The recognizer keeps the whole session's transcript until it is
+// restarted; a restart is how a line comes up blank instead of pre-lit.
+function freshEars(){judging=false;if(rec)try{rec.abort();}catch(_){/**/}}
+function jump(d){if(!running)return;hush();freshEars();
  // Stepping forward off the last line is how a run ends, not a wall.
  pos=Math.max(0,Math.min(queue.length,pos+d));
  if(paused){paused=false;if(rec)try{rec.start();}catch(_){/**/}}
