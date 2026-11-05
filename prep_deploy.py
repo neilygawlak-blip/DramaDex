@@ -430,10 +430,13 @@ def main():
     src, dst = sys.argv[1:3]
     os.makedirs(dst, exist_ok=True)
     # A page removed from the build must not linger from an old copy.
+    # The pages and, since 2026-11-05, each play's clean script copy
+    # (the Full Script overlay fetches it).
+    ship = lambda f: f.endswith(".html") or f.endswith("script.json")
     for f in os.listdir(dst):
-        if f.endswith(".html") and not os.path.exists(os.path.join(src, f)):
+        if ship(f) and not os.path.exists(os.path.join(src, f)):
             os.remove(os.path.join(dst, f))
-    files = [f for f in sorted(os.listdir(src)) if f.endswith(".html")]
+    files = [f for f in sorted(os.listdir(src)) if ship(f)]
     for f in files:
         shutil.copy2(os.path.join(src, f), os.path.join(dst, f))
 

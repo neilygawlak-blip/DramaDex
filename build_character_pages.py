@@ -529,6 +529,8 @@ TEMPLATE = """<!DOCTYPE html>
       box-shadow:0 8px 40px rgba(0,0,0,.8)}
  #ctx .fsline{margin:.4rem 0}
  #ctx .fsmine{color:#ffd75e}
+#ctx .fsdir{opacity:.8;font-style:italic}
+#ctx .fshead{font-weight:bold;text-align:center;margin:1.2rem 0 .6rem}
  #ctx .fsnow{outline:1px solid #ffd75e;border-radius:6px;padding:.15rem .35rem;display:inline-block}
  #where{margin-top:1.6rem;font-size:.78rem;letter-spacing:.06em;
       color:#55618a;text-transform:uppercase}
@@ -768,6 +770,7 @@ const stage=document.getElementById("stage"),my=document.getElementById("mystate
 const startbtn=document.getElementById("startbtn"),pausebtn=document.getElementById("pausebtn");
 const prevbtn=document.getElementById("prevbtn"),nextbtn=document.getElementById("nextbtn");
 let queue=[],pos=0,running=false,paused=false,judging=false,heard="",rec=null,revealed=false,simArmed=false;
+const SCRIPT_URL="__SCRIPT__";let SCRIPT=null;
 
 // ---- pick a system voice per character: gender, then accent preference ----
 const FEM=/female|zira|hazel|susan|heather|catherine|linda|samantha|karen|serena|kate|fiona|moira|tessa|libby|sonia|aria|jenny|michelle/i;
@@ -869,16 +872,31 @@ function show(l,auto){
  // gaps, so nothing new ships in the file.
  if(cb)cb.onclick=()=>{const x=document.getElementById("ctx");
   if(x.style.display==="block"){x.style.display="none";return;}
-  let h='<div style="text-align:right;position:sticky;top:0"><button id="fsclose">Close</button></div>';
-  queue.forEach((qi,k)=>{const L=DATA.lines[qi];
-   (L.gap||[]).forEach(g=>{h+='<div class="fsline">'+
-    (g.t?'<b>'+esc(g.s)+'.</b> '+esc(g.t):"\\u{1F514} (sound)")+"</div>";});
-   h+='<div class="fsline fsmine'+(k===pos?" fsnow":"")+'"><b>'+esc(NAME)+'.</b> '+esc(L.say)+'</div>';
-   (L.sim||[]).forEach(p=>{h+='<div class="fsline"><b>'+esc(p.s)+'.</b> '
-    +esc(p.t)+' <i>(together)</i></div>';});});
-  x.innerHTML=h;x.style.display="block";
-  document.getElementById("fsclose").onclick=()=>{x.style.display="none";};
-  const now=x.querySelector(".fsnow");if(now)now.scrollIntoView({block:"center"});};
+  const head='<div style="text-align:right;position:sticky;top:0"><button id="fsclose">Close</button></div>';
+  const open=h=>{x.innerHTML=head+h;x.style.display="block";
+   document.getElementById("fsclose").onclick=()=>{x.style.display="none";};
+   const now=x.querySelector(".fsnow");if(now)now.scrollIntoView({block:"center"});};
+  // The clean copy of the whole play, in script order, directions and
+  // headings included (Chris, 2026-11-05): one file per play, fetched
+  // once. The gap rebuild is only the fallback for a page opened as a
+  // file, where fetch cannot run.
+  const fromScript=S=>{const cur=DATA.lines[queue[pos]];let h="";
+   S.forEach(e=>{if(e.h){h+='<div class="fshead">'+esc(e.h)+'</div>';return;}
+    let t=e.t;if(e.s&&t.toUpperCase().startsWith(e.s.toUpperCase()))t=t.slice(e.s.length);
+    h+='<div class="fsline'+(e.s===NAME?" fsmine":"")+(e.s?"":" fsdir")
+     +(cur&&e.i===cur.i?" fsnow":"")+'">'+(e.s?'<b>'+esc(e.s)+'</b>':"")+esc(t)+'</div>';});
+   return h;};
+  const fromGaps=()=>{let h="";
+   queue.forEach((qi,k)=>{const L=DATA.lines[qi];
+    (L.gap||[]).forEach(g=>{h+='<div class="fsline">'+
+     (g.t?'<b>'+esc(g.s)+'.</b> '+esc(g.t):"\\u{1F514} (sound)")+"</div>";});
+    h+='<div class="fsline fsmine'+(k===pos?" fsnow":"")+'"><b>'+esc(NAME)+'.</b> '+esc(L.say)+'</div>';
+    (L.sim||[]).forEach(p=>{h+='<div class="fsline"><b>'+esc(p.s)+'.</b> '
+     +esc(p.t)+' <i>(together)</i></div>';});});
+   return h;};
+  if(SCRIPT)open(fromScript(SCRIPT));
+  else fetch(SCRIPT_URL).then(r=>r.ok?r.json():Promise.reject(r.status))
+   .then(S=>{SCRIPT=S;open(fromScript(S));}).catch(()=>open(fromGaps()));};
  const wb=document.getElementById("wordbtn"),lb=document.getElementById("linebtn");
  if(wb)wb.onclick=()=>{const nxt=stage.querySelector("#diff .pending:not(.lit):not(.show)");
   if(nxt)nxt.classList.add("show");};
@@ -1512,6 +1530,18 @@ def build_play(cfg, outdir):
     speeches = parse(cfg["raw"], cast, cfg)
     loose = loose_words(speeches)
     os.makedirs(outdir, exist_ok=True)
+    # The Full Script overlay reads the clean copy whole, in script order,
+    # directions and act headings included (Chris, 2026-11-05): every
+    # paragraph parse() kept, as written, one file per play.
+    script, act = [], None
+    for i, s in enumerate(speeches):
+        if s["act"] != act:
+            act = s["act"]
+            script.append({"h": act})
+        script.append({"i": i, "s": s["speaker"] or "", "t": s["text"]})
+    script_name = cfg["prefix"] + "script.json"
+    with open(os.path.join(outdir, script_name), "w", encoding="utf-8") as fh:
+        json.dump(script, fh, ensure_ascii=False)
     print("== %s — by %s == (%d loose words get bounded leeway)"
           % (cfg["title"], cfg["author"], len(loose)))
 
@@ -1568,6 +1598,7 @@ def build_play(cfg, outdir):
                 .replace("__HOME__", cfg["home"])
                 .replace("__COUNT__", str(len(lines)))
                 .replace("__BUILD__", build)
+                .replace("__SCRIPT__", script_name)
                 .replace("__DATA__", json.dumps(data, ensure_ascii=False)))
         path = os.path.join(outdir,
                             cfg["prefix"] + name.replace(" ", "_") + ".html")
