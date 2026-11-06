@@ -746,8 +746,13 @@ function soundSets(H){
  return {hset:new Set(H),pset:new Set(H.map(pkey).filter(k=>k.length>1)),
   hlist:H,joins};
 }
+// Sshhh / Ssshh / Ssssh / Sh: the recognizer never writes the sound
+// down, so the s-and-h word counts as said on any of the words it does
+// write for it (Chris, 2026-11-06).
+const SHUSH=["she","shh","sh","shush","sure"];
 const wordOk=(w,S)=>{w=canon(w);
  if(S.hset.has(w)||(w.length>2&&S.pset.has(pkey(w))))return true;
+ if(/^s+h+$/.test(w)&&SHUSH.some(h=>S.hset.has(h)))return true;
  // The bounded allowance, for flagged words only: off by one letter
  // (4-5 letters) or two (6+), against heard words or joined pairs.
  if(!LOOSE.has(w))return false;
@@ -1175,6 +1180,22 @@ document.getElementById("reportbtn").onclick=ev=>{ev.preventDefault();
   +encodeURIComponent("DramaDex bug \\u2014 "+NAME)
   +"&body="+encodeURIComponent(info+"\\n\\nWhat happened / what needs fixing:\\n");};
 
+// Everything the mic hears comes through this one door (so a test can
+// knock on it with no mic at all).
+function heardNow(text){
+ if(!judging)return;
+ heard=text;
+ const l=DATA.lines[queue[pos]];
+ // "next line", as the last two words heard, is Got it said aloud
+ // (Chris, 2026-11-06): hands free, and in none of the plays' text. The
+ // last two words only, so a script line holding "next" never fires it.
+ const W=norm(heard).split(" ").filter(w=>w);
+ if(W.length>=2&&W[W.length-2]==="next"&&W[W.length-1]==="line"){
+  hush();token++;freshEars();judged(l,l.say);return;}
+ if(simArmed&&heard.trim()){simArmed=false;startSim(l);}
+ lightUp(heard);
+ if(doneEnough(l)){try{rec.abort();}catch(_){/**/}judged(l,heard);setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);}
+}
 function initMic(){
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR||location.protocol==="file:"){rec=null;return;}
@@ -1184,14 +1205,9 @@ function initMic(){
  // cost is that a real-voice cue heard through the speaker can light
  // words early; seamlessness won that trade, and the Real voices toggle
  // is the out if the echo annoys during drills.
- rec.onresult=e=>{
-  if(!judging)return;
-  heard="";for(let i=0;i<e.results.length;i++)heard+=e.results[i][0].transcript+" ";
-  if(simArmed&&heard.trim()){simArmed=false;startSim(DATA.lines[queue[pos]]);}
-  lightUp(heard);
-  const l=DATA.lines[queue[pos]];
-  if(doneEnough(l)){try{rec.abort();}catch(_){/**/}judged(l,heard);setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);}
- };
+ rec.onresult=e=>{let t="";
+  for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript+" ";
+  heardNow(t);};
  rec.onerror=e=>{if(e.error==="not-allowed"||e.error==="service-not-allowed"||e.error==="audio-capture"){
   if(rec){rec.onend=null;try{rec.abort();}catch(_){/**/}}rec=null;
   if(judging)my.textContent="No mic here: say it out loud anyway, then \\u25B6";}};
