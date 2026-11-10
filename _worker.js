@@ -140,9 +140,23 @@ async function presence() {
   return json(body);
 }
 
+// A phone's mic test log (#miclog on a line page): the whole log, kept
+// two days, so an iPhone's listening can be read without the phone.
+async function miclog(req, env, url) {
+  const id = (url.searchParams.get("id") || "")
+    .replace(/[^0-9A-Za-z_-]/g, "").slice(0, 40);
+  const body = await req.text();
+  if (!id || !body || body.length > 200000)
+    return json({ error: "bad log" }, 400);
+  await env.VOICES.put("miclog/" + id, body, { expirationTtl: 172800 });
+  return json({ ok: true });
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
+    if (url.pathname === "/api/miclog" && req.method === "POST")
+      return miclog(req, env, url);
     if (url.pathname === "/api/voice-upload" && req.method === "POST")
       return upload(req, env, url);
     if (url.pathname === "/api/voice-presence") return presence();

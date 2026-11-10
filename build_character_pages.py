@@ -846,9 +846,10 @@ function ttsSpeak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynth
  // never fires onend at all. Whatever happens to the audio, the run must
  // move: done() is guaranteed, once, by whichever signal arrives first.
  let fin=false;const fin1=()=>{if(!fin){fin=true;clearTimeout(guard);done();}};
- u.onend=()=>{ttsEnd=performance.now();fin1();};u.onerror=fin1;
+ u.onstart=()=>mlog("cue voice started");
+ u.onend=()=>{ttsEnd=performance.now();mlog("cue voice ended");fin1();};u.onerror=fin1;
  const est=1200+t.split(" ").length*430/u.rate;
- const guard=setTimeout(fin1,est+2500);
+ const guard=setTimeout(()=>{if(!fin)mlog("cue voice never reported its end");fin1();},est+2500);
  speechSynthesis.speak(u);}
 
 function show(l,auto){
@@ -1215,75 +1216,103 @@ function heardNow(text){
 // ---- iPhone ears (iOS 27, WebKit bug 321436; Chris's phone is 27.2) ----
 // Since iOS 27 a recognizer that is listening while the page speaks goes
 // deaf and stays deaf, and so does one opened after another was cut
-// short. What testers found still works on real phones: a fresh
+// short. Laptop Chrome never comes through here.
+//
+// The first way (the default), from the tester on 27.0.1: a fresh
 // recognizer per listen, opened the moment a spoken phrase ends, never
-// continuous, and never stopped or aborted by the page. So on an iPhone:
+// continuous, and never stopped or aborted by the page. So:
 //  * nothing listens while a cue speaks; the listen opens when it ends
 //  * a listen is left to end by itself, and the next cue waits for that
 //    (a beat of up to a second and a half, iPhone only)
 //  * a listen that ends mid-line (a pause for breath) is followed by a
 //    silent phrase and a new listen, and what was heard carries over
-// Laptop Chrome never comes through here. Add #miclog to the address to
-// watch the ears work on the phone; #iosmic forces this path anywhere.
+// The second way (#b on the address), from the tester on 27.0: the listen
+// is cut the moment the page is about to speak, and a fresh continuous
+// one opens when the cue ends.
+//
+// #miclog shows the ears working in a strip on the phone AND sends the
+// whole log to the site's own store (two days), so it can be read without
+// anyone reading a phone screen aloud. #iosmic forces this path anywhere.
+// cap= pv= cut= on the address tune the first way without a new build.
 const IOSMIC=IOS||/iosmic/.test(location.hash);
 const MICLOG=/miclog/.test(location.hash);
-let ttsEnd=0,IOSEARS=null;
+const knob=(k,d)=>{const m=new RegExp("[#&-]"+k+"=([0-9.]+)").exec(location.hash);return m?+m[1]:d;};
+let ttsEnd=0,IOSEARS=null,mlogT=0,primeKeep=null;
+const MLOG=[],MLOGID=new Date().toISOString().replace(/[:.]/g,"-");
 function mlog(s){if(!MICLOG)return;
+ const NL=String.fromCharCode(10);
  let b=document.getElementById("miclog");
  if(!b){b=document.createElement("div");b.id="miclog";
   b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99;pointer-events:none;"+
    "background:rgba(0,0,0,.8);color:#9f9;font:11px/1.3 monospace;padding:4px 6px;white-space:pre-wrap";
-  document.body.appendChild(b);}
- const NL=String.fromCharCode(10),rows=(b.textContent?b.textContent.split(NL):[]);
- rows.push((performance.now()/1000).toFixed(1)+" "+s);
- b.textContent=rows.slice(-9).join(NL);}
+  document.body.appendChild(b);
+  MLOG.push(NAME+" "+location.hash+" "+navigator.userAgent);}
+ MLOG.push((performance.now()/1000).toFixed(2)+" "+s);
+ b.textContent=MLOG.slice(-9).join(NL);
+ clearTimeout(mlogT);mlogT=setTimeout(()=>{
+  fetch("/api/miclog?id="+MLOGID,{method:"POST",body:MLOG.join(NL)}).catch(()=>{});},700);}
 function iosEars(SR){
- let cur=null,carry="",last="",waiting=false,cutT=0,settleCb=null,settleT=0;
+ const B=/[#&-]b(&|-|$)/.test(location.hash);
+ const CAP=knob("cap",1500),PV=knob("pv",0),CUT=knob("cut",3000);
+ let cur=null,carry="",last="",waiting=false,cutT=0,settleCb=null,settleT=0,n=0;
  const live=()=>running&&!paused&&judging&&rec;
- const settled=()=>{clearTimeout(settleT);const cb=settleCb;settleCb=null;if(cb)cb();};
- function open(){
+ const settled=why=>{clearTimeout(settleT);const cb=settleCb;settleCb=null;
+  if(cb){mlog("next cue goes ("+why+")");cb();}};
+ function open(why){
   waiting=false;
   if(cur||!live())return;
-  const r=new SR();r.continuous=false;r.interimResults=true;r.lang="en-US";
-  cur=r;last="";
-  r.onstart=()=>mlog("listening");
-  r.onresult=e=>{if(cur!==r||r.old)return;let t="";
+  const r=new SR();r.continuous=B;r.interimResults=true;r.lang="en-US";
+  const id=++n;cur=r;last="";
+  ["audiostart","soundstart","speechstart","speechend","soundend","audioend","nomatch"].forEach(ev=>{
+   r["on"+ev]=()=>mlog("#"+id+" "+ev);});
+  r.onstart=()=>mlog("#"+id+" listening");
+  r.onresult=e=>{if(cur!==r||r.old){mlog("#"+id+" result ignored (old)");return;}let t="";
    for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript+" ";
-   last=t;mlog("heard: "+t.trim());heardNow(carry+t);};
-  r.onerror=e=>{mlog("error: "+e.error);
+   last=t;mlog("#"+id+" heard: "+t.trim());heardNow(carry+t);};
+  r.onerror=e=>{mlog("#"+id+" error: "+e.error);
    if(e.error==="not-allowed"||e.error==="service-not-allowed"){rec=null;
-    if(judging)my.textContent="No mic here: say it out loud anyway, then \\u25B6";}};
-  r.onend=()=>{mlog(r.old?"ended (old)":"ended");
+    if(judging)my.textContent="No mic here: say it out loud anyway, then "+String.fromCharCode(9654);}};
+  r.onend=()=>{mlog("#"+id+(r.old?" ended (old)":" ended"));
    if(cur!==r)return;cur=null;clearTimeout(cutT);
    if(!r.old)carry+=last;last="";
-   settled();
-   if(live())prime();};
-  try{r.start();mlog("open");}catch(x){mlog("open failed: "+x.name);cur=null;}
+   settled("listen ended");
+   if(live())prime("after an ending");};
+  try{r.start();mlog("#"+id+" open "+why+(B?" [b]":""));}
+  catch(x){mlog("#"+id+" open failed: "+x.name);cur=null;}
  }
  // A spoken phrase comes before every listen. The cue itself is that
  // phrase when it has only just ended; otherwise a silent one is said.
- function prime(){
+ function prime(why){
   if(waiting||cur||!live())return;waiting=true;
-  if(performance.now()-ttsEnd<400&&!speechSynthesis.speaking){open();return;}
-  let f=false;const go=()=>{if(f)return;f=true;clearTimeout(g);open();};
-  const u=new SpeechSynthesisUtterance("a");u.volume=0;u.rate=2;u.onend=go;u.onerror=go;
-  const g=setTimeout(go,900);
-  mlog("silent phrase");speechSynthesis.speak(u);
+  const age=Math.round(performance.now()-ttsEnd);
+  if(age<400){open(why+", "+age+"ms after the cue"
+    +(speechSynthesis.speaking?", voice still marked speaking":""));return;}
+  let f=false;const go=how=>{if(f)return;f=true;clearTimeout(g);
+   open(why+", after a silent phrase ("+how+")");};
+  const u=new SpeechSynthesisUtterance("a");u.volume=PV;u.rate=2;
+  u.onend=()=>go("ended");u.onerror=()=>go("errored");primeKeep=u;
+  const g=setTimeout(()=>go("timed out"),900);
+  mlog("silent phrase, cue ended "+age+"ms ago");speechSynthesis.speak(u);
  }
  return {
   // a line starts being judged
   listen(){carry="";last="";
-   if(!cur){prime();return;}
-   // An old listen is still open: it is not cut short unless it
-   // outstays three seconds, and its ending opens the new one.
+   if(!cur){prime("for a line");return;}
+   mlog("old listen still open when the line began");
    cur.old=true;clearTimeout(cutT);
-   cutT=setTimeout(()=>{if(cur&&cur.old){mlog("old listen cut");try{cur.abort();}catch(_){/**/}}},3000);},
-  // forget what was heard; the open listen is left to end by itself
-  abort(){carry="";last="";if(cur)cur.old=true;},
+   if(B){try{cur.abort();}catch(_){/**/}return;}
+   // First way: it is not cut short unless it outstays three seconds,
+   // and its ending opens the new one.
+   cutT=setTimeout(()=>{if(cur&&cur.old){mlog("old listen cut");try{cur.abort();}catch(_){/**/}}},CUT);},
+  // forget what was heard. First way: the open listen is left to end by
+  // itself. Second way: it is cut now, before the page speaks.
+  abort(){carry="";last="";if(!cur)return;cur.old=true;
+   if(B){mlog("listen cut before the page speaks");try{cur.abort();}catch(_){/**/}}},
   // run cb once the open listen has ended, or after a beat and a half
   settle(cb){settleCb=cb;clearTimeout(settleT);
-   if(!cur){settled();return;}
-   settleT=setTimeout(settled,1500);},
+   if(!cur){settled("no listen open");return;}
+   if(B){settled("second way never waits");return;}
+   settleT=setTimeout(()=>settled("capped at "+CAP+"ms, listen still open"),CAP);},
   start(){},stop(){if(cur)cur.old=true;},
  };
 }
