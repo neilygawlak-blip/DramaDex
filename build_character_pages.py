@@ -312,6 +312,7 @@ CD_SFX = [
 # Add to it as he reports them; never guess one in.
 HEARD_AS = {
     "palmer": ["bomber"],
+    "mrs": ["miss", "missus"],
 }
 
 PLAYS = {
@@ -759,10 +760,23 @@ function soundSets(H){
 // down, so the s-and-h word counts as said on any of the words it does
 // write for it (Chris, 2026-11-06).
 const SHUSH=["she","shh","sh","shush","sure"];
+const ENDS=["s","es","d","ed","ing"];
+function inflOf(base,w){
+ if(base.length<3||w.length<=base.length)return false;
+ const cut=base.slice(0,-1),lastc=base.slice(-1);
+ return ENDS.some(e=>w===base+e                    // walk  -> walked
+  ||w===base+lastc+e                               // slip  -> slipped
+  ||(lastc==="e"&&w===cut+e)                       // make  -> making
+  ||(lastc==="y"&&(w===cut+"ies"||w===cut+"ied")));// carry -> carried
+}
 const ALIAS=DATA.alias||{};
 const wordOk=(w,S)=>{w=canon(w);
  if(S.hset.has(w)||(w.length>2&&S.pset.has(pkey(w))))return true;
  if(/^s+h+$/.test(w)&&SHUSH.some(h=>S.hset.has(h)))return true;
+ // The same word in another tense or number (Chris asked 2026-11-05; his
+ // phone wrote "slipped" for "slip", 2026-11-10): one is the other plus a
+ // regular ending. Three letters and up, so tiny words cannot ride it.
+ if(w.length>2&&S.hlist.some(h=>inflOf(w,h)||inflOf(h,w)))return true;
  // Known mishearings of this exact script word (HEARD_AS in the build).
  if(ALIAS[w]&&ALIAS[w].some(h=>S.hset.has(h)))return true;
  // The bounded allowance, for flagged words only: off by one letter
@@ -1218,22 +1232,21 @@ function heardNow(text){
 // deaf and stays deaf, and so does one opened after another was cut
 // short. Laptop Chrome never comes through here.
 //
-// The first way (the default), from the tester on 27.0.1: a fresh
-// recognizer per listen, opened the moment a spoken phrase ends, never
-// continuous, and never stopped or aborted by the page. So:
-//  * nothing listens while a cue speaks; the listen opens when it ends
-//  * a listen is left to end by itself, and the next cue waits for that
-//    (a beat of up to a second and a half, iPhone only)
-//  * a listen that ends mid-line (a pause for breath) is followed by a
-//    silent phrase and a new listen, and what was heard carries over
-// The second way (#b on the address), from the tester on 27.0: the listen
-// is cut the moment the page is about to speak, and a fresh continuous
-// one opens when the cue ends.
+// What runs on an iPhone, proven on his phone 2026-11-10 (four listens in
+// a row heard him, pauses and all; logs miclog/2026-11-10T22-43-29): the
+// listen is CUT the moment the page is about to speak, and a fresh
+// CONTINUOUS one opens the moment the cue voice ends. Nothing listens
+// while a cue speaks, and the run never waits between lines.
+// The other way (#a on the address) is kept only for comparison: never
+// cut, never continuous, wait for each listen to end by itself. On his
+// phone it heard two lines, then a pause mid-line ended the listen and
+// the one opened after it was deaf (a silent phrase does not wake it;
+// miclog/2026-11-10T22-41-09).
 //
 // #miclog shows the ears working in a strip on the phone AND sends the
 // whole log to the site's own store (two days), so it can be read without
 // anyone reading a phone screen aloud. #iosmic forces this path anywhere.
-// cap= pv= cut= on the address tune the first way without a new build.
+// cap= pv= cut= on the address tune the #a way without a new build.
 const IOSMIC=IOS||/iosmic/.test(location.hash);
 const MICLOG=/miclog/.test(location.hash);
 const knob=(k,d)=>{const m=new RegExp("[#&-]"+k+"=([0-9.]+)").exec(location.hash);return m?+m[1]:d;};
@@ -1252,7 +1265,7 @@ function mlog(s){if(!MICLOG)return;
  clearTimeout(mlogT);mlogT=setTimeout(()=>{
   fetch("/api/miclog?id="+MLOGID,{method:"POST",body:MLOG.join(NL)}).catch(()=>{});},700);}
 function iosEars(SR){
- const B=/[#&-]b(&|-|$)/.test(location.hash);
+ const B=!/[#&-]a(&|-|$)/.test(location.hash);
  const CAP=knob("cap",1500),PV=knob("pv",0),CUT=knob("cut",3000);
  let cur=null,carry="",last="",waiting=false,cutT=0,settleCb=null,settleT=0,n=0;
  const live=()=>running&&!paused&&judging&&rec;
@@ -1277,7 +1290,7 @@ function iosEars(SR){
    if(!r.old)carry+=last;last="";
    settled("listen ended");
    if(live())prime("after an ending");};
-  try{r.start();mlog("#"+id+" open "+why+(B?" [b]":""));}
+  try{r.start();mlog("#"+id+" open "+why+(B?"":" [a]"));}
   catch(x){mlog("#"+id+" open failed: "+x.name);cur=null;}
  }
  // A spoken phrase comes before every listen. The cue itself is that
@@ -1311,7 +1324,7 @@ function iosEars(SR){
   // run cb once the open listen has ended, or after a beat and a half
   settle(cb){settleCb=cb;clearTimeout(settleT);
    if(!cur){settled("no listen open");return;}
-   if(B){settled("second way never waits");return;}
+   if(B){settled("never waits");return;}
    settleT=setTimeout(()=>settled("capped at "+CAP+"ms, listen still open"),CAP);},
   start(){},stop(){if(cur)cur.old=true;},
  };
