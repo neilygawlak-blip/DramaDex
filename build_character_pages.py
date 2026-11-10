@@ -305,6 +305,15 @@ CD_SFX = [
 ]
 
 
+# What the recognizer WRITES when a script word is said right. A name is
+# not wording: the phone hears "Harold Palmer" as "Harold bomber" (Chris,
+# iPhone, 2026-11-10), and no spelling or sound rule joins those two. One
+# row per script word, lower case, each mishearing he has actually seen.
+# Add to it as he reports them; never guess one in.
+HEARD_AS = {
+    "palmer": ["bomber"],
+}
+
 PLAYS = {
     "shtr": {
         "title": "See How They Run", "author": "Philip King",
@@ -750,9 +759,12 @@ function soundSets(H){
 // down, so the s-and-h word counts as said on any of the words it does
 // write for it (Chris, 2026-11-06).
 const SHUSH=["she","shh","sh","shush","sure"];
+const ALIAS=DATA.alias||{};
 const wordOk=(w,S)=>{w=canon(w);
  if(S.hset.has(w)||(w.length>2&&S.pset.has(pkey(w))))return true;
  if(/^s+h+$/.test(w)&&SHUSH.some(h=>S.hset.has(h)))return true;
+ // Known mishearings of this exact script word (HEARD_AS in the build).
+ if(ALIAS[w]&&ALIAS[w].some(h=>S.hset.has(h)))return true;
  // The bounded allowance, for flagged words only: off by one letter
  // (4-5 letters) or two (6+), against heard words or joined pairs.
  if(!LOOSE.has(w))return false;
@@ -1685,7 +1697,8 @@ def build_play(cfg, outdir):
             continue
         runs = runs_for(speeches, name)
         data = {"lines": lines, "runs": runs, "voices": cfg["voices"],
-                "avatars": cfg["avatars"], "loose": loose}
+                "avatars": cfg["avatars"], "loose": loose,
+                "alias": HEARD_AS}
         build = datetime.datetime.now().strftime("%b %d, %I:%M %p")
         html = (TEMPLATE
                 .replace("__AVATAR__", cfg["avatars"].get(name, ""))
