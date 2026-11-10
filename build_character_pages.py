@@ -834,7 +834,7 @@ function ttsSpeak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynth
  // never fires onend at all. Whatever happens to the audio, the run must
  // move: done() is guaranteed, once, by whichever signal arrives first.
  let fin=false;const fin1=()=>{if(!fin){fin=true;clearTimeout(guard);done();}};
- u.onend=fin1;u.onerror=fin1;
+ u.onend=()=>{ttsEnd=performance.now();fin1();};u.onerror=fin1;
  const est=1200+t.split(" ").length*430/u.rate;
  const guard=setTimeout(fin1,est+2500);
  speechSynthesis.speak(u);}
@@ -973,7 +973,7 @@ function myTurn(l,t,auto){
  if(auto){speak(l.say,1.3,NAME,()=>{if(t===token&&running&&!paused)
    setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},500);},l.l);
   startSim(l);}
- else{judging=true;
+ else{judging=true;if(rec&&rec.listen)rec.listen();
   // With a mic, the partners wait for the actor's first word: the
   // actor leads the together moment. No mic, nothing to wait for.
   if(rec)simArmed=!!(l.sim&&l.sim.length);else startSim(l);
@@ -1014,7 +1014,7 @@ function step(){
   const wait=playSfx(l.cue.sfx);
   setTimeout(()=>{if(t!==token||!running||paused)return;
    speak(l.cue.say,l.cue.pace,l.cue.speaker,()=>{if(t!==token||!running||paused)return;
-    judging=true;
+    judging=true;if(rec&&rec.listen)rec.listen();
     if(rec)simArmed=!!(l.sim&&l.sim.length);else startSim(l);
     my.textContent=rec?"":"No mic here: say it out loud anyway, then \\u25B6";},l.cue.l);},wait);
  }else{
@@ -1046,7 +1046,11 @@ function judged(l,text){
  // No beat at all (Chris's call): the next cue starts the moment the
  // line lands. The check draws while it talks; the left arrow is the
  // way back when a line deserves another pass.
- setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},0);
+ const go=()=>{if(t===token&&running&&!paused){pos++;step();}};
+ // iPhone only: the listen that just heard the line is left to end by
+ // itself before the next cue speaks (see iosEars). Everywhere else the
+ // run still never waits.
+ if(rec&&rec.settle)rec.settle(go);else setTimeout(go,0);
 }
 
 function lev(a,b){if(a===b)return 0;let p=[...Array(b.length+1).keys()];
@@ -1196,9 +1200,85 @@ function heardNow(text){
  lightUp(heard);
  if(doneEnough(l)){try{rec.abort();}catch(_){/**/}judged(l,heard);setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);}
 }
+// ---- iPhone ears (iOS 27, WebKit bug 321436; Chris's phone is 27.2) ----
+// Since iOS 27 a recognizer that is listening while the page speaks goes
+// deaf and stays deaf, and so does one opened after another was cut
+// short. What testers found still works on real phones: a fresh
+// recognizer per listen, opened the moment a spoken phrase ends, never
+// continuous, and never stopped or aborted by the page. So on an iPhone:
+//  * nothing listens while a cue speaks; the listen opens when it ends
+//  * a listen is left to end by itself, and the next cue waits for that
+//    (a beat of up to a second and a half, iPhone only)
+//  * a listen that ends mid-line (a pause for breath) is followed by a
+//    silent phrase and a new listen, and what was heard carries over
+// Laptop Chrome never comes through here. Add #miclog to the address to
+// watch the ears work on the phone; #iosmic forces this path anywhere.
+const IOSMIC=IOS||/iosmic/.test(location.hash);
+const MICLOG=/miclog/.test(location.hash);
+let ttsEnd=0,IOSEARS=null;
+function mlog(s){if(!MICLOG)return;
+ let b=document.getElementById("miclog");
+ if(!b){b=document.createElement("div");b.id="miclog";
+  b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99;pointer-events:none;"+
+   "background:rgba(0,0,0,.8);color:#9f9;font:11px/1.3 monospace;padding:4px 6px;white-space:pre-wrap";
+  document.body.appendChild(b);}
+ const NL=String.fromCharCode(10),rows=(b.textContent?b.textContent.split(NL):[]);
+ rows.push((performance.now()/1000).toFixed(1)+" "+s);
+ b.textContent=rows.slice(-9).join(NL);}
+function iosEars(SR){
+ let cur=null,carry="",last="",waiting=false,cutT=0,settleCb=null,settleT=0;
+ const live=()=>running&&!paused&&judging&&rec;
+ const settled=()=>{clearTimeout(settleT);const cb=settleCb;settleCb=null;if(cb)cb();};
+ function open(){
+  waiting=false;
+  if(cur||!live())return;
+  const r=new SR();r.continuous=false;r.interimResults=true;r.lang="en-US";
+  cur=r;last="";
+  r.onstart=()=>mlog("listening");
+  r.onresult=e=>{if(cur!==r||r.old)return;let t="";
+   for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript+" ";
+   last=t;mlog("heard: "+t.trim());heardNow(carry+t);};
+  r.onerror=e=>{mlog("error: "+e.error);
+   if(e.error==="not-allowed"||e.error==="service-not-allowed"){rec=null;
+    if(judging)my.textContent="No mic here: say it out loud anyway, then \\u25B6";}};
+  r.onend=()=>{mlog(r.old?"ended (old)":"ended");
+   if(cur!==r)return;cur=null;clearTimeout(cutT);
+   if(!r.old)carry+=last;last="";
+   settled();
+   if(live())prime();};
+  try{r.start();mlog("open");}catch(x){mlog("open failed: "+x.name);cur=null;}
+ }
+ // A spoken phrase comes before every listen. The cue itself is that
+ // phrase when it has only just ended; otherwise a silent one is said.
+ function prime(){
+  if(waiting||cur||!live())return;waiting=true;
+  if(performance.now()-ttsEnd<400&&!speechSynthesis.speaking){open();return;}
+  let f=false;const go=()=>{if(f)return;f=true;clearTimeout(g);open();};
+  const u=new SpeechSynthesisUtterance("a");u.volume=0;u.rate=2;u.onend=go;u.onerror=go;
+  const g=setTimeout(go,900);
+  mlog("silent phrase");speechSynthesis.speak(u);
+ }
+ return {
+  // a line starts being judged
+  listen(){carry="";last="";
+   if(!cur){prime();return;}
+   // An old listen is still open: it is not cut short unless it
+   // outstays three seconds, and its ending opens the new one.
+   cur.old=true;clearTimeout(cutT);
+   cutT=setTimeout(()=>{if(cur&&cur.old){mlog("old listen cut");try{cur.abort();}catch(_){/**/}}},3000);},
+  // forget what was heard; the open listen is left to end by itself
+  abort(){carry="";last="";if(cur)cur.old=true;},
+  // run cb once the open listen has ended, or after a beat and a half
+  settle(cb){settleCb=cb;clearTimeout(settleT);
+   if(!cur){settled();return;}
+   settleT=setTimeout(settled,1500);},
+  start(){},stop(){if(cur)cur.old=true;},
+ };
+}
 function initMic(){
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR||location.protocol==="file:"){rec=null;return;}
+ if(IOSMIC){rec=IOSEARS||(IOSEARS=iosEars(SR));mlog("iPhone ears");return;}
  rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang="en-US";
  // Deliberately simple (reverted Aug 11 after two smarter versions felt
  // laggy and unreliable): the whole session transcript counts. The known
