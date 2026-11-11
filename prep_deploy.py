@@ -179,6 +179,14 @@ PLAYPAGE = """<!DOCTYPE html>
  .intro{margin:1rem 0 1.6rem}
  .intro p{color:#9aa4c0;font-size:.92rem;margin:.55rem 0;line-height:1.55}
  .intro b{color:#c9d2ea;font-weight:600}
+ .hfhead{font-size:.74rem;letter-spacing:.09em;text-transform:uppercase;
+   color:#7d87a3;margin:1.2rem 0 .45rem}
+ .hfrow{display:flex;flex-wrap:wrap;gap:.5rem}
+ .hfbox{flex:1 1 13rem;border:1px solid #2b3a5e;border-radius:10px;
+   background:#0d1526;padding:.55rem .8rem;font-size:.88rem;
+   line-height:1.45;color:#9aa4c0}
+ .intro .hfbox b{display:block;color:#ffd75e;font-weight:600;font-size:.98rem;
+   margin-bottom:.1rem}
  .subacts{display:flex;gap:.5rem;margin:.4rem 0 0}
  .subacts a{flex:1;text-align:center;padding:.45rem .4rem;margin:0;
    font-size:.88rem;color:#9aa4c0}
@@ -198,6 +206,13 @@ line in rehearsal. Arrow keys skip around.</p>
 <p>Practice with <b>just Cue Lines</b>, or <b>Full scene</b> plays
 everyone else and waits for you; or <b>Listen through</b> the whole
 thing in your car.</p>
+<div class="hfhead">Hands-Free Mode - Voice Commands</div>
+<div class="hfrow">
+ <div class="hfbox"><b>&ldquo;Next line&rdquo;</b>Counts your line as done
+ and moves on.</div>
+ <div class="hfbox"><b>&ldquo;Read my line&rdquo;</b>Reads your line out
+ loud, then waits for you to say it.</div>
+</div>
 </div>
 __LINKS__
 <a id="backbtn" href="index.html">&#8592; Choose Your Play</a>
