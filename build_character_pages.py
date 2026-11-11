@@ -1246,6 +1246,31 @@ document.getElementById("reportbtn").onclick=ev=>{ev.preventDefault();
   +encodeURIComponent("DramaDex bug \\u2014 "+NAME)
   +"&body="+encodeURIComponent(info+"\\n\\nWhat happened / what needs fixing:\\n");};
 
+// "read my line": the page speaks the actor's current line in their
+// character's voice, then listens for it from the top. Nothing is revealed
+// on screen and the run does not move. The ears are cut while the page
+// speaks and wiped when it ends, the same as around a cue: otherwise the
+// mic hears the page's own voice and passes the line by itself, and on an
+// iPhone a listen left open under the voice goes deaf.
+const READS=new Set(["read","reed","red"]);
+function readMine(l){
+ const t=token;
+ judging=false;hush();
+ if(rec)try{rec.abort();}catch(_){/**/}
+ mlog("read my line");
+ my.textContent="Reading your line.";
+ // A breath between cancel and the speak, or Chrome eats the speak.
+ setTimeout(()=>{if(t!==token||!running||paused)return;
+  speak(l.say,1.3,NAME,()=>{
+   if(t!==token||!running||paused)return;
+   if(rec&&!rec.listen)try{rec.abort();}catch(_){/**/}
+   // The ears start blank, so the words do too: lit words the wiped
+   // ears no longer hold would show a finished line that will not pass.
+   stage.querySelectorAll("#diff .lit").forEach(s=>s.classList.remove("lit"));
+   heard="";my.textContent="";
+   judging=true;if(rec&&rec.listen)rec.listen();
+  },l.l);},150);
+}
 // Everything the mic hears comes through this one door (so a test can
 // knock on it with no mic at all).
 function heardNow(text){
@@ -1258,6 +1283,11 @@ function heardNow(text){
  const W=norm(heard).split(" ").filter(w=>w);
  if(W.length>=2&&W[W.length-2]==="next"&&W[W.length-1]==="line"){
   hush();token++;freshEars();judged(l,l.say);return;}
+ // "read my line", as the last three words heard, has the page say the
+ // current line aloud (Chris, 2026-11-11: the second hands-free command).
+ // The phrase is in none of the plays' text.
+ if(W.length>=3&&READS.has(W[W.length-3])&&W[W.length-2]==="my"&&W[W.length-1]==="line"){
+  readMine(l);return;}
  if(simArmed&&heard.trim()){simArmed=false;startSim(l);}
  lightUp(heard);
  if(doneEnough(l)){try{rec.abort();}catch(_){/**/}judged(l,heard);setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);}
