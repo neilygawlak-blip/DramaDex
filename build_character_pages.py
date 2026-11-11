@@ -1246,30 +1246,35 @@ document.getElementById("reportbtn").onclick=ev=>{ev.preventDefault();
   +encodeURIComponent("DramaDex bug \\u2014 "+NAME)
   +"&body="+encodeURIComponent(info+"\\n\\nWhat happened / what needs fixing:\\n");};
 
-// "read my line": the page speaks the actor's current line in their
-// character's voice, then listens for it from the top. Nothing is revealed
-// on screen and the run does not move. The ears are cut while the page
-// speaks and wiped when it ends, the same as around a cue: otherwise the
-// mic hears the page's own voice and passes the line by itself, and on an
-// iPhone a listen left open under the voice goes deaf.
+// "read my line" / "read their line": the page speaks the actor's current
+// line in their character's voice, or repeats the cue in its speaker's
+// voice (with its sound effect), then listens for the line from the top.
+// Nothing is revealed on screen and the run does not move. The ears are
+// cut while the page speaks and wiped when it ends, the same as around a
+// cue: otherwise the mic hears the page's own voice and passes the line by
+// itself, and on an iPhone a listen left open under the voice goes deaf.
 const READS=new Set(["read","reed","red"]);
-function readMine(l){
+const THEIRS=new Set(["their","there","they're","theyre"]);
+let nwSeen=0,nwTok=-1;
+function readAloud(l,theirs){
  const t=token;
  judging=false;hush();
  if(rec)try{rec.abort();}catch(_){/**/}
- mlog("read my line");
- my.textContent="Reading your line.";
+ mlog(theirs?"read their line":"read my line");
+ my.textContent=theirs?"Reading their line.":"Reading your line.";
+ const after=()=>{
+  if(t!==token||!running||paused)return;
+  if(rec&&!rec.listen)try{rec.abort();}catch(_){/**/}
+  // The ears start blank, so the words do too: lit words the wiped
+  // ears no longer hold would show a finished line that will not pass.
+  stage.querySelectorAll("#diff .lit").forEach(s=>s.classList.remove("lit"));
+  heard="";nwSeen=0;my.textContent="";
+  judging=true;if(rec&&rec.listen)rec.listen();};
+ const wait=theirs?playSfx(l.cue.sfx):0;
  // A breath between cancel and the speak, or Chrome eats the speak.
  setTimeout(()=>{if(t!==token||!running||paused)return;
-  speak(l.say,1.3,NAME,()=>{
-   if(t!==token||!running||paused)return;
-   if(rec&&!rec.listen)try{rec.abort();}catch(_){/**/}
-   // The ears start blank, so the words do too: lit words the wiped
-   // ears no longer hold would show a finished line that will not pass.
-   stage.querySelectorAll("#diff .lit").forEach(s=>s.classList.remove("lit"));
-   heard="";my.textContent="";
-   judging=true;if(rec&&rec.listen)rec.listen();
-  },l.l);},150);
+  if(theirs)speak(l.cue.say,l.cue.pace,l.cue.speaker,after,l.cue.l);
+  else speak(l.say,1.3,NAME,after,l.l);},Math.max(150,wait));
 }
 // Everything the mic hears comes through this one door (so a test can
 // knock on it with no mic at all).
@@ -1286,8 +1291,29 @@ function heardNow(text){
  // "read my line", as the last three words heard, has the page say the
  // current line aloud (Chris, 2026-11-11: the second hands-free command).
  // The phrase is in none of the plays' text.
- if(W.length>=3&&READS.has(W[W.length-3])&&W[W.length-2]==="my"&&W[W.length-1]==="line"){
-  readMine(l);return;}
+ if(W.length>=3&&READS.has(W[W.length-3])&&W[W.length-1]==="line"){
+  if(W[W.length-2]==="my"){readAloud(l,false);return;}
+  // "read their line" repeats the cue (Chris, 2026-11-11).
+  if(THEIRS.has(W[W.length-2])){readAloud(l,true);return;}
+ }
+ // "next word" is the Next Word button said aloud (Chris, 2026-11-11). It
+ // must NOT wipe the ears: the words already landed still have to count
+ // when the rest of the line arrives. So instead of acting on "the last
+ // two words", which the recognizer repeats on every update, it counts
+ // how many times the phrase is in what was heard and acts only when
+ // that count goes up. The phrase is then taken out of what was heard,
+ // so "next" and "word" never light a word of the line. A line that
+ // holds the phrase itself (none does today) simply has no such command.
+ if(nwTok!==token){nwTok=token;nwSeen=0;}
+ if(!(" "+norm(l.say)+" ").includes(" next word ")){
+  const K=[];let n=0;
+  for(let i=0;i<W.length;i++){
+   if(W[i]==="next"&&W[i+1]==="word"){n++;i++;}else K.push(W[i]);}
+  if(n)heard=K.join(" ");
+  if(n>nwSeen){nwSeen=n;mlog("next word");
+   const wb=document.getElementById("wordbtn");if(wb)wb.click();}
+  else if(n<nwSeen)nwSeen=n;
+ }
  if(simArmed&&heard.trim()){simArmed=false;startSim(l);}
  lightUp(heard);
  if(doneEnough(l)){try{rec.abort();}catch(_){/**/}judged(l,heard);setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);}
