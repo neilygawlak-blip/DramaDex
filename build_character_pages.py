@@ -310,6 +310,20 @@ CD_SFX = [
 # iPhone, 2026-11-10), and no spelling or sound rule joins those two. One
 # row per script word, lower case, each mishearing he has actually seen.
 # Add to it as he reports them; never guess one in.
+# The sound a landed line makes, beside the green check (Chris asked
+# 2026-11-11). One short mp3 from sounds/, written into every line page so
+# it plays with no second request and from a file:// handout too. The other
+# three in sounds/ are the alternates: change the name here and rebuild.
+CHIME = "chime_lift.mp3"
+
+
+def chime_b64():
+    import base64
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", CHIME)
+    with open(path, "rb") as fh:
+        return base64.b64encode(fh.read()).decode()
+
+
 HEARD_AS = {
     "palmer": ["bomber"],
     "mrs": ["miss", "missus"],
@@ -1052,11 +1066,31 @@ function step(){
 }
 
 let nailT=0;
+// ---- the "line landed" chime ----
+// A short mp3 carried in the page, decoded once inside the Start tap (the
+// same tap that wakes the effects engine) and played through that engine,
+// so a phone needs no second tap for it. #nochime on the address turns it
+// off without a new build.
+const CHIME_MP3="__CHIME__",CHIME_ON=!/nochime/.test(location.hash);
+let chimeBuf=null;
+function loadChime(){
+ if(chimeBuf||!AC||!CHIME_ON)return;
+ try{const s=atob(CHIME_MP3),a=new Uint8Array(s.length);
+  for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);
+  AC.decodeAudioData(a.buffer,b=>{chimeBuf=b;},()=>{});}catch(_){/**/}
+}
+function chime(){
+ if(!AC||!chimeBuf)return;
+ try{const s=AC.createBufferSource(),g=AC.createGain();
+  g.gain.value=.55;s.buffer=chimeBuf;
+  s.connect(g).connect(AC.destination);s.start();mlog("chime");}catch(_){/**/}
+}
 function judged(l,text){
  judging=false;const g=grade(l.say,text);
  // The check floats OVER the run: the next line starts underneath it
  // immediately, and it draws, lingers a beat, and fades on its own.
  if(g.nailed){
+  chime();
   const fx=document.getElementById("nailfx");
   fx.innerHTML='<svg viewBox="0 0 52 52">'+
    '<circle class="ccirc" cx="26" cy="26" r="24"/>'+
@@ -1129,6 +1163,7 @@ function start(q){
  // engine and the speech engine here, while this IS a real tap.
  if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();
  if(AC.state==="suspended")AC.resume();
+ loadChime();
  try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u);}catch(_){/**/}
  lockWake();initMic();step();
 }
@@ -1750,6 +1785,7 @@ def build_play(cfg, outdir):
                 .replace("__COUNT__", str(len(lines)))
                 .replace("__BUILD__", build)
                 .replace("__SCRIPT__", script_name)
+                .replace("__CHIME__", chime_b64())
                 .replace("__DATA__", json.dumps(data, ensure_ascii=False)))
         path = os.path.join(outdir,
                             cfg["prefix"] + name.replace(" ", "_") + ".html")
