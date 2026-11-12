@@ -5,6 +5,8 @@
 //   node rig/rig.mjs CD_RUELLA           smoke run on another page
 //   node rig/rig.mjs CD_HAROLD 911,915   those lines (script positions)
 //   node rig/rig.mjs CD_HAROLD 911,915 whole   ...each taken that way
+//   RIG_DEBUG=1 before it also prints what the recognizer wrote for each
+//   line and which of its words stayed unlit.
 //       (whole, nextword, readmine, nextline, slow; a list is used in turn)
 //   slow = the way he works a monologue: eight words, a four-second
 //   pause, eight more. It reports the moment the line lets go, and every
@@ -133,6 +135,7 @@ const SHIM = `(()=>{
     this.addEventListener("error",x=>R.ears.push([now(),"error:"+x.error]));
     this.addEventListener("result",x=>{R.results=(R.results||0)+1;R.lastResult=now();
      let t="";for(let i=0;i<x.results.length;i++)t+=x.results[i][0].transcript+" ";
+     R.text=t;
      const w=t.trim().toLowerCase().split(" ").filter(x=>x);const tip=w[w.length-1];
      if(tip&&R.tips[R.tips.length-1]!==tip)R.tips.push(tip);});}
    return start.call(this,track);};
@@ -272,6 +275,13 @@ try {
       await speakIn("next line");
     }
     const ok = await passed(8000);
+    // RIG_DEBUG=1: what the recognizer wrote for the line, and the words of
+    // the line it left unlit. Shown on this machine only; it is play text.
+    if (process.env.RIG_DEBUG) {
+      const d = await tab.ev(`JSON.stringify({text:__rig.text,unlit:grade(DATA.lines[${l.k}].say,__rig.text||"").marks.filter(m=>!m.ok).map(m=>m.w)})`).then(JSON.parse);
+      console.log(`     recognizer wrote: ${(d.text || "(nothing)").trim()}`);
+      console.log(`     left unlit: ${d.unlit.join(", ") || "nothing"}`);
+    }
     // On the page's own clock: when the run moved on, against when the last
     // recording ended. Negative means it let go before the words were out.
     const gap = await tab.ev(`(__rig.moved[${k + 1}]||0)-__rig.spokeEnd`);

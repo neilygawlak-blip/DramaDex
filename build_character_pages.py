@@ -376,6 +376,11 @@ def tests_for(stem, lines):
 HEARD_AS = {
     "palmer": ["bomber"],
     "mrs": ["miss", "missus"],
+    # "Head porter's" said together comes back as the one word
+    # "headquarters" (Chris, 2026-11-12, Harold line 8; the rig showed it
+    # three times in three). Both halves take it.
+    "head": ["headquarters"],
+    "porters": ["headquarters"],
 }
 
 PLAYS = {
