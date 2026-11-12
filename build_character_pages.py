@@ -814,7 +814,7 @@ function grade(expected,heard){
 const stage=document.getElementById("stage"),my=document.getElementById("mystate");
 const startbtn=document.getElementById("startbtn"),pausebtn=document.getElementById("pausebtn");
 const prevbtn=document.getElementById("prevbtn"),nextbtn=document.getElementById("nextbtn");
-let queue=[],pos=0,running=false,paused=false,judging=false,heard="",rec=null,revealed=false,simArmed=false;
+let queue=[],pos=0,running=false,paused=false,judging=false,heard="",kept="",rec=null,revealed=false,simArmed=false;
 const SCRIPT_URL="__SCRIPT__";let SCRIPT=null;
 
 // ---- pick a system voice per character: gender, then accent preference ----
@@ -1048,7 +1048,7 @@ function step(){
   document.getElementById("runbackbtn").onclick=()=>start(currentSet());
   return;}
  const t=++token;
- const l=DATA.lines[queue[pos]];heard="";simArmed=false;
+ const l=DATA.lines[queue[pos]];heard="";kept="";simArmed=false;
  setWhere(l);
  if(mode.value==="drill"||mode.value==="quiz"){
   show(l,false);
@@ -1268,7 +1268,7 @@ function readAloud(l,theirs){
   // The ears start blank, so the words do too: lit words the wiped
   // ears no longer hold would show a finished line that will not pass.
   stage.querySelectorAll("#diff .lit").forEach(s=>s.classList.remove("lit"));
-  heard="";nwSeen=0;my.textContent="";
+  heard="";kept="";nwSeen=0;my.textContent="";
   judging=true;if(rec&&rec.listen)rec.listen();};
  const wait=theirs?playSfx(l.cue.sfx):0;
  // A breath between cancel and the speak, or Chrome eats the speak.
@@ -1276,11 +1276,36 @@ function readAloud(l,theirs){
   if(theirs)speak(l.cue.say,l.cue.pace,l.cue.speaker,after,l.cue.l);
   else speak(l.say,1.3,NAME,after,l.l);},Math.max(150,wait));
 }
+// "next word" said aloud: the page SAYS the word as well as showing it
+// (Chris, 2026-11-12: hands free means they cannot look at it either). The
+// word is the one the Next Word button picks, the first not yet landed or
+// shown. The ears are cut while the page speaks, as around every other
+// voice, so the mic cannot land the word off the page's own voice and an
+// iPhone listen is never open under speech. Unlike "read my line" the
+// progress is KEPT: what was heard so far goes into `kept`, which the door
+// puts in front of whatever the fresh ears hear next.
+function wordAloud(l){
+ const nxt=stage.querySelector("#diff .pending:not(.lit):not(.show)");
+ if(!nxt)return;
+ nxt.classList.add("show");
+ const t=token,w=nxt.textContent;
+ judging=false;hush();
+ kept=heard;nwSeen=0;
+ if(rec)try{rec.abort();}catch(_){/**/}
+ mlog("next word: "+w);
+ const after=()=>{
+  if(t!==token||!running||paused)return;
+  if(rec&&!rec.listen)try{rec.abort();}catch(_){/**/}
+  judging=true;if(rec&&rec.listen)rec.listen();};
+ // A breath between cancel and the speak, or Chrome eats the speak.
+ setTimeout(()=>{if(t!==token||!running||paused)return;
+  ttsSpeak(w,1,NAME,after);},150);
+}
 // Everything the mic hears comes through this one door (so a test can
 // knock on it with no mic at all).
 function heardNow(text){
  if(!judging)return;
- heard=text;
+ heard=kept?kept+" "+text:text;
  const l=DATA.lines[queue[pos]];
  // "next line", as the last two words heard, is Got it said aloud
  // (Chris, 2026-11-06): hands free, and in none of the plays' text. The
@@ -1305,18 +1330,20 @@ function heardNow(text){
  // so "next" and "word" never light a word of the line. A line that
  // holds the phrase itself (none does today) simply has no such command.
  if(nwTok!==token){nwTok=token;nwSeen=0;}
+ let askWord=false;
  if(!(" "+norm(l.say)+" ").includes(" next word ")){
   const K=[];let n=0;
   for(let i=0;i<W.length;i++){
    if(W[i]==="next"&&W[i+1]==="word"){n++;i++;}else K.push(W[i]);}
   if(n)heard=K.join(" ");
-  if(n>nwSeen){nwSeen=n;mlog("next word");
-   const wb=document.getElementById("wordbtn");if(wb)wb.click();}
+  if(n>nwSeen){nwSeen=n;askWord=true;}
   else if(n<nwSeen)nwSeen=n;
  }
  if(simArmed&&heard.trim()){simArmed=false;startSim(l);}
  lightUp(heard);
- if(doneEnough(l)){try{rec.abort();}catch(_){/**/}judged(l,heard);setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);}
+ if(doneEnough(l)){try{rec.abort();}catch(_){/**/}judged(l,heard);setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);return;}
+ // After the lighting, so the word given is the first one still dark.
+ if(askWord)wordAloud(l);
 }
 // ---- iPhone ears (iOS 27, WebKit bug 321436; Chris's phone is 27.2) ----
 // Since iOS 27 a recognizer that is listening while the page speaks goes

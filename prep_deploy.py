@@ -208,8 +208,8 @@ everyone else and waits for you; or <b>Listen through</b> the whole
 thing in your car.</p>
 <div class="hfhead">Hands-Free Mode - Voice Commands</div>
 <div class="hfrow">
- <div class="hfbox"><b>&ldquo;Next word&rdquo;</b>Shows the next word of
- your line.</div>
+ <div class="hfbox"><b>&ldquo;Next word&rdquo;</b>Says the next word of
+ your line out loud, and shows it.</div>
  <div class="hfbox"><b>&ldquo;Next line&rdquo;</b>Counts your line as done
  and moves on.</div>
  <div class="hfbox"><b>&ldquo;Read my line&rdquo;</b>Reads your line out
