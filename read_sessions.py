@@ -21,7 +21,7 @@ import sys
 
 WRANGLER = "npx wrangler@4.120.1"
 CACHE = ".sessions"
-OUT = {"v": "voice", "g": "Got it", "n": "next line", "a": "arrow on", "b": "arrow back"}
+OUT = {"v": "voice", "q": "quiet-beat pass", "g": "Got it", "n": "next line", "a": "arrow on", "b": "arrow back"}
 
 
 def namespace():
@@ -116,7 +116,7 @@ def main():
             tries[key] += 1
             if r[1] in "gn":
                 stuck[key].append(r[3])
-            elif r[1] == "v" and r[2] > 3 and r[3] < 70:
+            elif r[1] in "vq" and r[2] > 3 and r[3] < 70:
                 early[key].append(r[3])
     print("\nLINES FINISHED BY HAND (Got it / next line): page, line, times of tries, avg %% the ears had")
     rows = sorted(stuck.items(), key=lambda kv: -len(kv[1]))[:25]

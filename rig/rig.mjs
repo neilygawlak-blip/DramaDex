@@ -4,6 +4,8 @@
 //   node rig/rig.mjs                     smoke run on CD_HAROLD
 //   node rig/rig.mjs CD_RUELLA           smoke run on another page
 //   node rig/rig.mjs CD_HAROLD 911,915   those lines (script positions)
+//   node rig/rig.mjs CD_HAROLD 911,915 whole   ...each taken that way
+//       (whole, nextword, readmine, nextline; a list is used in turn)
 //
 // How (proven 2026-11-12, Chrome 157): the recognizer accepts an audio
 // track in place of the microphone, recognition.start(track). The rig
@@ -178,7 +180,7 @@ try {
   say("chrome: " + (/Chrome\/[\d.]+/.exec(ua) || [""])[0] + ", real recognition, audio fed as a track");
 
   // Each line is taken a different way, in turn.
-  const WAYS = ["whole", "nextword", "whole", "readmine", "nextline"];
+  const WAYS = args[2] ? args[2].split(",") : ["whole", "nextword", "whole", "readmine", "nextline"];
   for (let k = 0; k < pick.length; k++) {
     const l = pick[k], way = WAYS[k % WAYS.length];
     const head = `line ${k + 1} (i=${l.i}, ${l.n} words, ${way})`;

@@ -1071,8 +1071,8 @@ let token=0;
 //   had caught, words heard, seconds on the line, seconds listening,
 //   Next Word taps, "next word" said, Line taps, "read my line",
 //   "read their line"]
-// outcome: v passed by voice, g Got it, n "next line", a arrow on, b arrow
-// back. A line often finished by g or n with a high % is a gate that will
+// outcome: v passed by voice, q passed after a quiet beat (the last word
+// not heard again), g Got it, n "next line", a arrow on, b arrow back. A line often finished by g or n with a high % is a gate that will
 // not open; with 0% the mic was not hearing; a v with a low % let go early.
 const TRACK=!/notrack/.test(location.hash)&&location.protocol!=="file:";
 const SESS={v:1,id:new Date().toISOString().slice(0,19).replace(/[:T]/g,"-")
@@ -1228,6 +1228,9 @@ function lev(a,b){if(a===b)return 0;let p=[...Array(b.length+1).keys()];
  for(let i=1;i<=a.length;i++){const c=[i];
   for(let j=1;j<=b.length;j++)c.push(Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]!==b[j-1])));
   p=c;}return p[b.length];}
+// Set by doneEnough when a line is all green but its repeated last word
+// has not been heard again: heardNow then passes it after a quiet beat.
+let greenWait=false,greenT=0;
 function doneEnough(l){
  const E=norm(l.say).split(" ").filter(w=>w);
  if(!E.length)return true;
@@ -1237,18 +1240,48 @@ function doneEnough(l){
  if(!H.length)return false;
  const S=soundSets(H);
  const hit=E.filter(w=>wordOk(w,S)).length;
+ const last=canon(E[E.length-1]);
+ const tol=LOOSE.has(last)?(last.length>=6?2:1):(last.length>=5?1:0);
+ const like=h=>h===last||(tol&&lev(h,last)<=tol)||(last.length>2&&pkey(h)===pkey(last));
+ // Has the last word been heard AGAIN, after its latest earlier copy?
+ // True when the line holds no earlier copy at all.
+ const saidAgain=()=>{
+  let j=-1;
+  for(let i=E.length-2;i>=0;i--)if(like(canon(E[i]))){j=i;break;}
+  if(j<0)return true;
+  const HC=H.map(canon);
+  if(HC.filter(like).length>=E.filter(w=>like(canon(w))).length)return true;
+  const B=soundSets(E.slice(0,j+1));
+  const U=[...new Set(E.slice(j+1,E.length-1))].filter(w=>!wordOk(w,B));
+  if(!U.length)return false;
+  let p=-1,q=-1;
+  for(let i=H.length-1;i>=0;i--){
+   if(p<0&&like(HC[i]))p=i;
+   if(q<0){const one=soundSets([H[i]]);if(U.some(w=>wordOk(w,one)))q=i;}
+   if(p>=0&&q>=0)break;}
+  return q>=0&&p>q;};
  // Every word landed: the display shows all green, so the gate opens.
  // No last-word ceremony when there is nothing left to say.
- if(hit===E.length)return true;
+ if(hit===E.length){
+  // Unless the last word ALSO comes earlier in the line (Chris,
+  // 2026-11-12: "we give credit for the final word without it being said
+  // again at the end"). One "Lennox" lights both, so "Lennox? Who's
+  // Lennox?" went green, and passed, a word early. Then the last word has
+  // to be heard AGAIN: after a word that only the stretch between its
+  // earlier copy and the end holds, or, where that stretch has no word of
+  // its own, as many times as the line holds it. If it is not, the line
+  // WAITS rather than refuses: heardNow passes it once nothing new has
+  // been heard for a beat (greenWait), so a copy the mic missed costs a
+  // pause and never a freeze, which is what sank the earlier tries.
+  if(saidAgain())return true;
+  greenWait=true;return false;
+ }
  // Below 100%: advance only when the word JUST spoken is the line's
  // final word (off-by-a-letter allowed on longer words). Matching
  // anywhere in the transcript let a mid-line stall advance the run the
  // moment an earlier word resembled the ending.
- const last=canon(E[E.length-1]);
- const tol=LOOSE.has(last)?(last.length>=6?2:1):(last.length>=5?1:0);
  const tail=H.slice(-2).map(canon);
- let endsRight=tail.some(h=>h===last||(tol&&lev(h,last)<=tol)
-  ||(last.length>2&&pkey(h)===pkey(last)));
+ let endsRight=tail.some(like);
  // A flagged final word may also arrive split in two ("to varish").
  if(!endsRight&&LOOSE.has(last)&&tail.length===2)
   endsRight=lev(tail.join(""),last)<=tol;
@@ -1269,7 +1302,6 @@ function doneEnough(l){
  // line said right). A copy with fewer than three new words after it is
  // left alone: an early pass there skips a word or two at most. The
  // numbers from replaying every line of the three plays are in the commit.
- const like=h=>h===last||(tol&&lev(h,last)<=tol)||(last.length>2&&pkey(h)===pkey(last));
  for(let i=E.length-2;i>=0;i--){
   if(!like(canon(E[i])))continue;
   const B=soundSets(E.slice(0,i+1));
@@ -1281,7 +1313,12 @@ function doneEnough(l){
    if(got<tot)return false;}
   break;
  }
- return hit/E.length>=.55;
+ if(hit/E.length<.55)return false;
+ // Enough of the line, and it ends on the last word: but if that word has
+ // an earlier copy and has not been heard again since, this may be the
+ // earlier copy. Wait as the all-green case does, and pass on a quiet beat.
+ if(!saidAgain()){greenWait=true;return false;}
+ return true;
 }
 
 function start(q){
@@ -1464,6 +1501,7 @@ function wordAloud(l){
 // knock on it with no mic at all).
 function heardNow(text){
  if(!judging)return;
+ clearTimeout(greenT);
  heard=kept?kept+" "+text:text;
  const l=DATA.lines[queue[pos]];
  // "next line", as the last two words heard, is Got it said aloud
@@ -1500,7 +1538,16 @@ function heardNow(text){
  }
  if(simArmed&&heard.trim()){simArmed=false;startSim(l);}
  lightUp(heard);
- if(doneEnough(l)){noteDone(l,"v");try{rec.abort();}catch(_){/**/}judged(l,heard);setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);return;}
+ const pass=how=>{noteDone(l,how);try{rec.abort();}catch(_){/**/}judged(l,heard);
+  setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);};
+ greenWait=false;
+ if(doneEnough(l)){pass("v");return;}
+ // All green, waiting on the last word said again: 1.8 s with nothing new
+ // heard and it passes anyway (outcome "q" in the session notes, so how
+ // often this happens can be counted).
+ if(greenWait){const t=token;greenT=setTimeout(()=>{
+  if(t!==token||!judging||!running||paused)return;
+  mlog("all green and quiet: passed");pass("q");},1800);}
  // After the lighting, so the word given is the first one still dark.
  if(askWord)wordAloud(l);
 }
