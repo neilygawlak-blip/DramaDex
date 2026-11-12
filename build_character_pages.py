@@ -1145,6 +1145,30 @@ function doneEnough(l){
  // what is it?" says "it" at word four. The ending only counts once
  // most of the line is behind them. Three words or fewer are exempt.
  if(E.length<=3)return true;
+ // A last word that ALSO comes earlier in the line (Chris, 2026-11-12:
+ // "...did you? ... will you?" let go at the first "you", ten words into
+ // twenty-three; "a machine ... a machine" at the first "machine"). The
+ // count above is no guard there: it lights every copy of a word at once,
+ // so half a line can read as 55%. So: take the latest earlier copy that
+ // still has three or more words after it which the line has not used
+ // before. Two of those words must have been heard; or, failing that, the
+ // last word must have been heard as many times as the line holds it.
+ // Deliberately loose (his order: sooner move on falsely than freeze on a
+ // line said right). A copy with fewer than three new words after it is
+ // left alone: an early pass there skips a word or two at most. The
+ // numbers from replaying every line of the three plays are in the commit.
+ const like=h=>h===last||(tol&&lev(h,last)<=tol)||(last.length>2&&pkey(h)===pkey(last));
+ for(let i=E.length-2;i>=0;i--){
+  if(!like(canon(E[i])))continue;
+  const B=soundSets(E.slice(0,i+1));
+  const U=[...new Set(E.slice(i+1,E.length-1))].filter(w=>!wordOk(w,B));
+  if(U.length<3)continue;
+  if(U.filter(w=>wordOk(w,S)).length<2){
+   const tot=E.filter(w=>like(canon(w))).length;
+   const got=H.filter(w=>like(canon(w))).length;
+   if(got<tot)return false;}
+  break;
+ }
  return hit/E.length>=.55;
 }
 
