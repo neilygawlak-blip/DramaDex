@@ -1267,7 +1267,10 @@ function readAloud(l,theirs){
   if(rec&&!rec.listen)try{rec.abort();}catch(_){/**/}
   // The ears start blank, so the words do too: lit words the wiped
   // ears no longer hold would show a finished line that will not pass.
-  stage.querySelectorAll("#diff .lit").forEach(s=>s.classList.remove("lit"));
+  // The given-word marks go as well (Chris, 2026-11-12): the line starts
+  // from the top, so "next word" must be able to give again the word it
+  // gave before the read, which is the likeliest one to stall on twice.
+  stage.querySelectorAll("#diff .pending").forEach(s=>s.classList.remove("lit","show"));
   heard="";kept="";nwSeen=0;my.textContent="";
   judging=true;if(rec&&rec.listen)rec.listen();};
  const wait=theirs?playSfx(l.cue.sfx):0;
