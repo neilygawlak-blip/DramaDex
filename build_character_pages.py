@@ -878,7 +878,7 @@ function ttsSpeak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynth
  u.onend=()=>{ttsEnd=performance.now();mlog("cue voice ended");fin1();};u.onerror=fin1;
  const est=1200+t.split(" ").length*430/u.rate;
  const guard=setTimeout(()=>{if(!fin)mlog("cue voice never reported its end");fin1();},est+2500);
- speechSynthesis.speak(u);}
+ ttsKeep=u;speechSynthesis.speak(u);}
 
 function show(l,auto){
  const c=l.cue;
@@ -1165,11 +1165,13 @@ function start(q){
  if(AC.state==="suspended")AC.resume();
  loadChime();
  try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u);}catch(_){/**/}
+ if(HOLDASK)holdMic();
  lockWake();initMic();step();
 }
 function stop(){running=false;unlockWake();startbtn.style.display="";pausebtn.style.display="none";
  prevbtn.style.display="none";nextbtn.style.display="none";
- if(rec){rec.onend=null;rec.stop();rec=null;}}
+ if(rec){rec.onend=null;rec.stop();rec=null;}
+ dropMic();}
 // The recognizer keeps the whole session's transcript until it is
 // restarted; a restart is how a line comes up blank instead of pre-lit.
 function freshEars(){judging=false;if(rec)try{rec.abort();}catch(_){/**/}}
@@ -1212,10 +1214,12 @@ function pause(){if(paused)return;paused=true;token++;judging=false;
  pausebtn.textContent="\\u25B6";pausebtn.title="resume";
  hush();
  if(rec)try{rec.abort();}catch(_){/**/}
+ dropMic();
  my.textContent="Paused.";}
 function resume(){if(!paused)return;paused=false;autoPaused=false;
  pausebtn.textContent="\\u23F8";pausebtn.title="pause";
  my.textContent="";
+ if(HOLDASK)holdMic();
  if(rec)try{rec.start();}catch(_){/**/}
  step();}
 pausebtn.onclick=()=>{paused?resume():pause();};
@@ -1299,6 +1303,7 @@ function wordAloud(l){
  const after=()=>{
   if(t!==token||!running||paused)return;
   if(rec&&!rec.listen)try{rec.abort();}catch(_){/**/}
+  mlog("ears back after the word");
   judging=true;if(rec&&rec.listen)rec.listen();};
  // A breath between cancel and the speak, or Chrome eats the speak.
  setTimeout(()=>{if(t!==token||!running||paused)return;
@@ -1371,7 +1376,7 @@ function heardNow(text){
 const IOSMIC=IOS||/iosmic/.test(location.hash);
 const MICLOG=/miclog/.test(location.hash);
 const knob=(k,d)=>{const m=new RegExp("[#&-]"+k+"=([0-9.]+)").exec(location.hash);return m?+m[1]:d;};
-let ttsEnd=0,IOSEARS=null,mlogT=0,primeKeep=null;
+let ttsEnd=0,IOSEARS=null,mlogT=0,primeKeep=null,ttsKeep=null;
 const MLOG=[],MLOGID=new Date().toISOString().replace(/[:.]/g,"-");
 function mlog(s){if(!MICLOG)return;
  const NL=String.fromCharCode(10);
@@ -1385,6 +1390,43 @@ function mlog(s){if(!MICLOG)return;
  b.textContent=MLOG.slice(-9).join(NL);
  clearTimeout(mlogT);mlogT=setTimeout(()=>{
   fetch("/api/miclog?id="+MLOGID,{method:"POST",body:MLOG.join(NL)}).catch(()=>{});},700);}
+// ---- the mic held open for the whole run (Chris, 2026-11-12) ----
+// Every cut of the ears closes the microphone and every restart opens it
+// again. A Bluetooth headset (his AirPods) changes mode each time: stereo
+// for listening when no mic is open, the headset mode when one is. Flipped
+// several times a line it drops out, and in the end the mic and the sound
+// both go until the page is reloaded. One plain microphone stream, opened
+// when the ears first hear and closed only on pause or stop, keeps the
+// headset in one mode for the whole run; the ears cut and restart under it
+// exactly as before. Nothing reads this stream and nothing is recorded.
+//
+// On by itself on a Windows computer in Chrome or Edge, where he found it
+// (#nohold on the address turns it off). Anywhere else, the iPhone
+// included, only with #hold on the address: an iPhone with a mic stream
+// open may play its sound quieter or through the earpiece, so that one is
+// his to try before the cast gets it.
+const UA=navigator.userAgent;
+const HOLDASK=/(^|[#&-])hold/.test(location.hash);
+const HOLD=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)
+ &&!/nohold/.test(location.hash)
+ &&(HOLDASK||(!IOSMIC&&/Windows/.test(UA)&&/Chrome[/]/.test(UA)));
+let micHold=null,micAsked=false,micDead=false;
+function holdMic(){
+ if(!HOLD||micHold||micAsked||micDead)return;micAsked=true;
+ navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,
+   noiseSuppression:false,autoGainControl:false}})
+  .then(s=>{
+   if(!micAsked){s.getTracks().forEach(t=>t.stop());return;}
+   micHold=s;micAsked=false;mlog("mic held open");
+   s.getTracks().forEach(t=>{t.onended=()=>{mlog("held mic ended by itself");
+    if(micHold===s)micHold=null;};});})
+  .catch(e=>{micAsked=false;micDead=true;mlog("mic hold failed: "+e.name);});
+}
+function dropMic(){
+ micAsked=false;
+ if(micHold){micHold.getTracks().forEach(t=>{t.onended=null;t.stop();});
+  micHold=null;mlog("held mic released");}
+}
 function iosEars(SR){
  const B=!/[#&-]a(&|-|$)/.test(location.hash);
  const CAP=knob("cap",1500),PV=knob("pv",0),CUT=knob("cut",3000);
@@ -1460,13 +1502,21 @@ function initMic(){
  // cost is that a real-voice cue heard through the speaker can light
  // words early; seamlessness won that trade, and the Real voices toggle
  // is the out if the echo annoys during drills.
+ let pcLogT=0;
  rec.onresult=e=>{let t="";
   for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript+" ";
+  if(MICLOG&&judging&&performance.now()-pcLogT>400){pcLogT=performance.now();
+   const w=t.trim().split(" ");mlog("pc heard "+w.length+" words, last: "+w.slice(-3).join(" "));}
   heardNow(t);};
- rec.onerror=e=>{if(e.error==="not-allowed"||e.error==="service-not-allowed"||e.error==="audio-capture"){
+ rec.onstart=()=>mlog("pc listening");
+ rec.onaudiostart=()=>{mlog("pc mic open");holdMic();};
+ rec.onaudioend=()=>mlog("pc mic closed");
+ rec.onerror=e=>{mlog("pc error: "+e.error);
+  if(e.error==="not-allowed"||e.error==="service-not-allowed"||e.error==="audio-capture"){
   if(rec){rec.onend=null;try{rec.abort();}catch(_){/**/}}rec=null;
+  dropMic();
   if(judging)my.textContent="No mic here: say it out loud anyway, then \\u25B6";}};
- rec.onend=()=>{if(running&&!paused&&rec)try{rec.start();}catch(_){/**/}};
+ rec.onend=()=>{mlog("pc ended");if(running&&!paused&&rec)try{rec.start();}catch(_){/**/}};
  try{rec.start();}catch(_){rec=null;}
 }
 </script></body></html>
