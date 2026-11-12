@@ -801,7 +801,12 @@ const wordOk=(w,S)=>{w=canon(w);
  const near=h=>Math.abs(h.length-w.length)<=tol&&lev(h,w)<=tol;
  return S.hlist.some(near)||S.joins.some(near);};
 function grade(expected,heard){
- const E=norm(expected).split(" ").filter(w=>w),H=norm(heard).split(" ").filter(w=>!FILLERS.has(w));
+ // A filler the line itself holds is a word of the line (2026-11-12): 24
+ // lines end in "well" or "like", and with those thrown away the last
+ // word never arrived, so the line could not pass by voice or draw its
+ // check. Fillers the line does not hold are still dropped.
+ const E=norm(expected).split(" ").filter(w=>w),own=new Set(E),
+  H=norm(heard).split(" ").filter(w=>!FILLERS.has(w)||own.has(w));
  const S=soundSets(H);let hit=0;const marks=E.map(w=>{const ok=wordOk(w,S);if(ok)hit++;return {w,ok};});
  const r=E.length?hit/E.length:1;
  // One tier or silence, by Chris's call: the unlit words already say
@@ -1121,7 +1126,9 @@ function lev(a,b){if(a===b)return 0;let p=[...Array(b.length+1).keys()];
 function doneEnough(l){
  const E=norm(l.say).split(" ").filter(w=>w);
  if(!E.length)return true;
- const H=norm(heard).split(" ").filter(w=>!FILLERS.has(w));
+ // As in grade(): a filler the line itself holds is kept.
+ const own=new Set(E);
+ const H=norm(heard).split(" ").filter(w=>!FILLERS.has(w)||own.has(w));
  if(!H.length)return false;
  const S=soundSets(H);
  const hit=E.filter(w=>wordOk(w,S)).length;
