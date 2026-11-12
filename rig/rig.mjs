@@ -10,6 +10,10 @@
 //   pause, eight more. It reports the moment the line lets go, and every
 //   word the recognizer ever showed as the newest one (its guesses change
 //   as it listens, and a passing guess can open the gate).
+//   longpause = most of the line, twenty-five seconds of silence, the rest.
+//   (Found 2026-11-12: silence alone does NOT end a listen here.)
+//   restart = most of the line, then the listen is ended the way a network
+//   blip ends one, then the rest: the line must keep its credit.
 //
 // How (proven 2026-11-12, Chrome 157): the recognizer accepts an audio
 // track in place of the microphone, recognition.start(track). The rig
@@ -178,6 +182,8 @@ try {
   for (const l of pick) texts.push(P.whole(l), P.head(l), P.rest(l));
   const chunks = l => { const c = []; for (let a = 0; a < l.words.length; a += 8) c.push(l.words.slice(a, a + 8).join(" ")); return c; };
   if ((args[2] || "").includes("slow")) for (const l of pick) texts.push(...chunks(l));
+  const cut = l => Math.floor(l.n * .7);
+  if (/longpause|restart/.test(args[2] || "")) for (const l of pick) texts.push(l.words.slice(0, cut(l)).join(" "), l.words.slice(cut(l)).join(" "));
   say(`rig: ${PAGE}, ${pick.length} lines, recording what is new...`);
   record(texts);
   const url = t => "/__wav/" + wavName(t);
@@ -239,6 +245,27 @@ try {
       const odd = tips.filter(w => !l.words.includes(w.replace(/[^a-z0-9']/g, "")));
       note = `${restarts} listen(s) ended during it (${[...new Set(ev.filter(e => e.startsWith("error")))].join(", ") || "no errors"}); guesses not in the line: ${[...new Set(odd)].slice(0, 12).join(", ") || "none"}`;
       if (early) { failed++; say(`FAIL ${head}: ${early}; ${note}`); continue; }
+    } else if (way === "restart") {
+      const e0 = await tab.ev("__rig.ears.length");
+      await speakIn(l.words.slice(0, cut(l)).join(" "));
+      await sleep(1500);
+      await tab.ev("rec.stop()");           // the listen ends without the page asking
+      await sleep(2500);
+      const mid = await tab.ev(`JSON.stringify({pos,kept:norm(kept).split(" ").filter(w=>w).length,lit:stage.querySelectorAll("#diff .lit").length})`).then(JSON.parse);
+      const ev = await tab.ev(`JSON.stringify(__rig.ears.slice(${e0}).map(e=>e[1]))`).then(JSON.parse);
+      note = `listen ended and restarted (${ev.filter(e => e === "end").length} end, ${ev.filter(e => e === "start").length} start); credit carried: ${mid.kept} words of the ${cut(l)} said, ${mid.lit} lit`;
+      if (mid.pos > k) { failed++; say(`FAIL ${head}: LET GO at the restart; ${note}`); continue; }
+      if (!mid.kept) { failed++; note += "; NOTHING CARRIED"; }
+      await speakIn(l.words.slice(cut(l)).join(" "));
+    } else if (way === "longpause") {
+      const e0 = await tab.ev("__rig.ears.length");
+      await speakIn(l.words.slice(0, cut(l)).join(" "));
+      await sleep(25000);
+      const mid = await tab.ev(`JSON.stringify({pos,heard:norm(heard).split(" ").filter(w=>w).length,kept:norm(kept).split(" ").filter(w=>w).length})`).then(JSON.parse);
+      const ev = await tab.ev(`JSON.stringify(__rig.ears.slice(${e0}).map(e=>e[1]))`).then(JSON.parse);
+      note = `during the silence ${ev.filter(e => e === "end").length} listen(s) ended (${[...new Set(ev.filter(e => e.startsWith("error")))].join(", ") || "no errors"}); credit carried: ${mid.kept} words`;
+      if (mid.pos > k) { failed++; say(`FAIL ${head}: LET GO during the silence; ${note}`); continue; }
+      await speakIn(l.words.slice(cut(l)).join(" "));
     } else if (way === "nextline") {
       await speakIn(P.head(l));
       await sleep(400);

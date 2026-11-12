@@ -1372,7 +1372,7 @@ function stop(){running=false;sendSess(true);unlockWake();startbtn.style.display
  dropMic();}
 // The recognizer keeps the whole session's transcript until it is
 // restarted; a restart is how a line comes up blank instead of pre-lit.
-function freshEars(){judging=false;if(rec)try{rec.abort();}catch(_){/**/}}
+function freshEars(){judging=false;kept="";if(rec)try{rec.abort();}catch(_){/**/}}
 function jump(d){if(!running)return;
  if(sLine&&pos<queue.length)noteDone(DATA.lines[queue[pos]],d>0?"a":"b");
  hush();freshEars();
@@ -1742,7 +1742,17 @@ function initMic(){
   if(rec){rec.onend=null;try{rec.abort();}catch(_){/**/}}rec=null;
   dropMic();
   if(judging)my.textContent="No mic here: say it out loud anyway, then \\u25B6";}};
- rec.onend=()=>{mlog("pc ended");SESS.restarts++;if(running&&!paused&&rec)try{rec.start();}catch(_){/**/}};
+ // A listen that ends BY ITSELF in the middle of a line (the browser ends
+ // one after a stretch of silence, or on a network blip) starts the next
+ // one with nothing in it, and the line's credit used to go with it: the
+ // words stayed green while the gate counted from zero (2026-11-12; his
+ // sessions showed 55-83 restarts each, and a 57-word speech passing only
+ // after 251 words were heard). So what was heard is carried into `kept`,
+ // which the door puts in front of whatever comes next. Only while a line
+ // is being judged: every wipe the page itself makes (a pass, Got it, an
+ // arrow, pause, a read) turns judging off or empties `heard` first.
+ rec.onend=()=>{mlog("pc ended");SESS.restarts++;
+  if(judging&&heard.trim()){kept=heard;mlog("credit carried: "+norm(kept).split(" ").length+" words");}if(running&&!paused&&rec)try{rec.start();}catch(_){/**/}};
  SESS.ears="pc";
  try{rec.start();}catch(_){rec=null;SESS.ears="none";}
 }
