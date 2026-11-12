@@ -324,6 +324,55 @@ def chime_b64():
         return base64.b64encode(fh.read()).decode()
 
 
+# Test links (Chris, 2026-11-12: "when you need a test please present me a
+# link with the sandbox setup"). tests.json names each test; the page it
+# belongs to carries it, and <page>.html#test=<name> opens that page with
+# the test's lines, mode and steps already set. See tests.json.
+SITE = "https://dramadex.pages.dev/"
+
+
+def load_tests():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests.json")
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as fh:
+        tests = json.load(fh)
+    tests.pop("_about", None)
+    for name, t in tests.items():
+        # The name rides in the address beside the other knobs and in the
+        # log's id (40 characters, set by the worker).
+        if not re.fullmatch(r"[a-z0-9]{1,12}", name):
+            sys.exit("tests.json: %r must be 1-12 lowercase letters or digits" % name)
+        for word in ("miclog", "iosmic", "nohold"):
+            if word in name:
+                sys.exit("tests.json: %r holds the knob %r" % (name, word))
+        for key in ("page", "title", "device", "mode", "lines", "steps"):
+            if key not in t:
+                sys.exit("tests.json: %r has no %r" % (name, key))
+    return tests
+
+
+TESTS = load_tests()
+TESTS_SEEN = set()
+
+
+def tests_for(stem, lines):
+    have = {l["i"] for l in lines}
+    out = {}
+    for name, t in TESTS.items():
+        if t["page"] != stem:
+            continue
+        missing = [i for i in t["lines"] if i not in have]
+        if missing:
+            sys.exit("tests.json: %r names lines %s that %s does not have"
+                     % (name, missing, stem))
+        TESTS_SEEN.add(name)
+        out[name] = {k: t[k] for k in ("title", "device", "mode", "lines", "steps")}
+        print("  test link: %s%s.html#test=%s%s"
+              % (SITE, stem, name, t.get("knobs", "")))
+    return out
+
+
 HEARD_AS = {
     "palmer": ["bomber"],
     "mrs": ["miss", "missus"],
@@ -623,6 +672,10 @@ just speak when it's your turn.</div>
 <script>
 const DATA=__DATA__;
 const NAME="__NAME__";
+// ---- test links: <page>.html#test=<name> (tests.json) ----
+const TESTS=__TESTS__;
+const TESTM=/test=([a-z0-9]+)/.exec(location.hash);
+const TEST=TESTM&&TESTS[TESTM[1]]?Object.assign({id:TESTM[1]},TESTS[TESTM[1]]):null;
 // Words this play uses that common English does not (names, foreign
 // exclamations, theater exotica). ONLY these get the bounded fuzzy
 // allowance below; everything else keeps the strict rules.
@@ -644,6 +697,7 @@ buildScope();
 if(DATA.runs.length)scope.value="run:0";
 
 function currentSet(){
+ if(TEST)return TEST.lines.map(g=>DATA.lines.findIndex(l=>l.i===g)).filter(i=>i>=0);
  const v=scope.value;
  if(v==="all")return DATA.lines.map((_,i)=>i);
  if(v.startsWith("act:"))return DATA.lines.map((l,i)=>[l,i]).filter(x=>x[0].act===v.slice(4)).map(x=>x[1]);
@@ -1416,22 +1470,26 @@ function heardNow(text){
 // anyone reading a phone screen aloud. #iosmic forces this path anywhere.
 // cap= pv= cut= on the address tune the #a way without a new build.
 const IOSMIC=IOS||/iosmic/.test(location.hash);
-const MICLOG=/miclog/.test(location.hash);
+const MLOGSHOW=/miclog/.test(location.hash);
+const MICLOG=MLOGSHOW||!!TEST;
 const knob=(k,d)=>{const m=new RegExp("[#&-]"+k+"=([0-9.]+)").exec(location.hash);return m?+m[1]:d;};
 let ttsEnd=0,IOSEARS=null,mlogT=0,primeKeep=null,ttsKeep=null;
-const MLOG=[],MLOGID=new Date().toISOString().replace(/[:.]/g,"-");
+const MLOG=[],MLOGID=(TEST?"t-"+TEST.id+"-":"")+new Date().toISOString().replace(/[:.]/g,"-");
+function sendLog(){
+ return fetch("/api/miclog?id="+MLOGID,{method:"POST",body:MLOG.join(String.fromCharCode(10))})
+  .then(r=>r.ok).catch(()=>false);}
 function mlog(s){if(!MICLOG)return;
  const NL=String.fromCharCode(10);
- let b=document.getElementById("miclog");
- if(!b){b=document.createElement("div");b.id="miclog";
-  b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99;pointer-events:none;"+
-   "background:rgba(0,0,0,.8);color:#9f9;font:11px/1.3 monospace;padding:4px 6px;white-space:pre-wrap";
-  document.body.appendChild(b);
-  MLOG.push(NAME+" "+location.hash+" "+navigator.userAgent);}
+ if(!MLOG.length)MLOG.push(NAME+" "+location.hash+" build __BUILD__ "+navigator.userAgent);
  MLOG.push((performance.now()/1000).toFixed(2)+" "+s);
- b.textContent=MLOG.slice(-9).join(NL);
- clearTimeout(mlogT);mlogT=setTimeout(()=>{
-  fetch("/api/miclog?id="+MLOGID,{method:"POST",body:MLOG.join(NL)}).catch(()=>{});},700);}
+ if(MLOGSHOW){
+  let b=document.getElementById("miclog");
+  if(!b){b=document.createElement("div");b.id="miclog";
+   b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99;pointer-events:none;"+
+    "background:rgba(0,0,0,.8);color:#9f9;font:11px/1.3 monospace;padding:4px 6px;white-space:pre-wrap";
+   document.body.appendChild(b);}
+  b.textContent=MLOG.slice(-9).join(NL);}
+ clearTimeout(mlogT);mlogT=setTimeout(sendLog,700);}
 // ---- the mic held open for the whole run (Chris, 2026-11-12) ----
 // Every cut of the ears closes the microphone and every restart opens it
 // again. A Bluetooth headset (his AirPods) changes mode each time: stereo
@@ -1560,6 +1618,54 @@ function initMic(){
   if(judging)my.textContent="No mic here: say it out loud anyway, then \\u25B6";}};
  rec.onend=()=>{mlog("pc ended");if(running&&!paused&&rec)try{rec.start();}catch(_){/**/}};
  try{rec.start();}catch(_){rec=null;}
+}
+
+// ---- the test card (a page opened by a test link) ----
+// What to do, on which device; a button for the moment it goes wrong, so
+// the log shows where; and a result that sends the whole log now. The
+// scene and mode pickers are put away: the test has chosen both.
+if(TESTM&&!TEST)my.textContent="This test link is out of date. Ask for a new one.";
+if(TEST){
+ mode.value=TEST.mode;scope.style.display="none";mode.style.display="none";
+ const card=document.createElement("div");card.id="testcard";
+ card.style.cssText="border:1px solid #ffd75e;border-radius:10px;background:#111a30;"+
+  "padding:.7rem .9rem;margin:.6rem 0;font-size:.92rem;line-height:1.45";
+ const bs="font-size:.9rem;padding:.4rem .7rem;margin:.35rem .35rem 0 0";
+ card.innerHTML='<div style="color:#ffd75e;font-weight:700">Test: '+esc(TEST.title)+'</div>'+
+  '<div style="color:#9aa4c0">Use: '+esc(TEST.device)+'</div>'+
+  '<ol id="tsteps" style="margin:.4rem 0 .2rem;padding-left:1.3rem">'+
+  TEST.steps.map(s=>'<li>'+esc(s)+'</li>').join("")+'</ol>'+
+  '<button id="tmark" style="'+bs+'">Mark this moment</button>'+
+  '<button id="tshow" style="'+bs+';display:none">Show the steps</button>'+
+  '<div><input id="tnote" placeholder="Anything you noticed (optional)" style="width:100%;'+
+  'box-sizing:border-box;margin-top:.5rem;font-size:.9rem;padding:.4rem .5rem;border-radius:8px;'+
+  'border:1px solid #2b3a5e;background:#0a0f1e;color:#e8e6df"></div>'+
+  '<button id="tok" style="'+bs+'">It worked</button>'+
+  '<button id="tbad" style="'+bs+'">It went wrong</button>'+
+  '<div id="tsent" style="color:#9aa4c0;margin-top:.35rem"></div>';
+ document.getElementById("controls").before(card);
+ const sent=document.getElementById("tsent");
+ // On a phone the steps would push the line off the screen, so they fold
+ // away at Start and come back with one tap.
+ const steps=document.getElementById("tsteps"),tshow=document.getElementById("tshow");
+ startbtn.addEventListener("click",()=>{steps.style.display="none";tshow.style.display="";
+  tshow.textContent="Show the steps";});
+ tshow.onclick=()=>{const hid=steps.style.display==="none";
+  steps.style.display=hid?"":"none";tshow.textContent=hid?"Hide the steps":"Show the steps";};
+ let marks=0;
+ document.getElementById("tmark").onclick=()=>{marks++;
+  mlog("MARK "+marks+" (line "+(pos+1)+" of "+queue.length+(running?"":", not running")+")");
+  sent.textContent="Marked ("+marks+"). Keep going.";};
+ const result=how=>{
+  mlog("RESULT "+how+" | marks "+marks+" | note: "+document.getElementById("tnote").value.trim());
+  sent.textContent="Sending...";
+  sendLog().then(ok=>{sent.textContent=ok
+   ?"Sent. Tell Claude the test '"+TEST.id+"' is in."
+   :"Could not send. Tell Claude what happened instead.";});};
+ document.getElementById("tok").onclick=()=>result("worked");
+ document.getElementById("tbad").onclick=()=>result("went wrong");
+ mlog("test "+TEST.id+" opened; held mic "+(HOLD?"on":"off")+"; "
+  +(IOSMIC?"iPhone ears":"computer ears")+"; "+TEST.lines.length+" lines, "+TEST.mode);
 }
 </script></body></html>
 """
@@ -1955,7 +2061,9 @@ def build_play(cfg, outdir):
                 "avatars": cfg["avatars"], "loose": loose,
                 "alias": HEARD_AS}
         build = datetime.datetime.now().strftime("%b %d, %I:%M %p")
+        stem = cfg["prefix"] + name.replace(" ", "_")
         html = (TEMPLATE
+                .replace("__TESTS__", json.dumps(tests_for(stem, lines)))
                 .replace("__AVATAR__", cfg["avatars"].get(name, ""))
                 .replace("__NAME__", name)
                 .replace("__PLAY__", cfg["title"])

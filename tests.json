@@ -1,0 +1,49 @@
+{
+ "_about": "Test links for Chris. Each entry becomes a link: https://dramadex.pages.dev/<page>.html#test=<name><knobs>. The page opens with these lines, this mode and the steps on screen, logs the ears, and sends the log to the site's store as miclog/t-<name>-<time> when he taps a result. Read them with: python read_test_logs.py <name>. Names: lowercase letters and digits, 12 at most. Lines are script positions (the i of a line), never the text. Steps must not quote the play.",
+
+ "airpodspc": {
+  "page": "CD_HAROLD",
+  "title": "AirPods on the PC",
+  "device": "Windows PC, Chrome, AirPods connected",
+  "mode": "drill",
+  "knobs": "",
+  "lines": [903, 905, 911, 915, 917, 920, 924, 926],
+  "steps": [
+   "Connect your AirPods to the PC, then press Start.",
+   "Say each of the 8 lines as it comes up.",
+   "On two of the longer lines, stop partway, say \"next word\", then carry on.",
+   "If the AirPods drop out or the mic stops hearing you, tap Mark this moment.",
+   "When the run ends, tap It worked or It went wrong."
+  ]
+ },
+
+ "nextwordios": {
+  "page": "CD_HAROLD",
+  "title": "Next word on the iPhone",
+  "device": "iPhone, AirPods connected",
+  "mode": "drill",
+  "knobs": "",
+  "lines": [911, 915, 917, 920, 928, 934],
+  "steps": [
+   "Connect your AirPods to the iPhone, then press Start.",
+   "On every line: say the first few words, say \"next word\", wait for the word, then say it and carry on.",
+   "The moment it stops hearing you, tap Mark this moment, then keep going if you can.",
+   "When the run ends, or you give up, tap It worked or It went wrong."
+  ]
+ },
+
+ "holdios": {
+  "page": "CD_HAROLD",
+  "title": "Mic held open on the iPhone",
+  "device": "iPhone, AirPods connected",
+  "mode": "drill",
+  "knobs": "-hold",
+  "lines": [903, 905, 911, 915, 917, 920, 924, 926],
+  "steps": [
+   "Do this one after the Next word test. Connect your AirPods, then press Start.",
+   "Say each of the 8 lines as it comes up, as you normally would.",
+   "If the AirPods drop out or the mic stops hearing you, tap Mark this moment.",
+   "At the end, write in the box whether the sound was quieter or different from normal, then tap a result."
+  ]
+ }
+}

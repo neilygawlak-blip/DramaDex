@@ -148,7 +148,10 @@ async function miclog(req, env, url) {
   const body = await req.text();
   if (!id || !body || body.length > 200000)
     return json({ error: "bad log" }, 400);
-  await env.VOICES.put("miclog/" + id, body, { expirationTtl: 172800 });
+  // A test link's log (id t-<name>-<time>) is kept two weeks: he may run
+  // a test days before it is read.
+  const ttl = id.startsWith("t-") ? 1209600 : 172800;
+  await env.VOICES.put("miclog/" + id, body, { expirationTtl: ttl });
   return json({ ok: true });
 }
 

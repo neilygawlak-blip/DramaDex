@@ -15,7 +15,7 @@ import os
 import shutil
 import sys
 
-from build_character_pages import PLAYS
+from build_character_pages import PLAYS, TESTS
 
 INDEX = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
@@ -443,6 +443,50 @@ link to their page, e.g. `https://<name>.pages.dev/PENELOPE.html`.
 """
 
 
+# The Tests page (Chris, 2026-11-12): one address to keep on the phone,
+# /tests, listing every test in tests.json as a button. Nothing has to be
+# sent to a device: a new test is on this page the moment it is deployed.
+TESTPAGE = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tests — Pineapple Playhouse</title>
+<style>
+ body{font-family:"Segoe UI Variable Display","Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
+      max-width:640px;margin:0 auto;padding:1.2rem 1rem 4rem;background:#0a0f1e;color:#e8e6df;line-height:1.5}
+ h1{font-size:1.4rem;font-weight:800;margin:0 0 .2rem;color:#ffd75e}
+ .muted{color:#7d87a3;font-size:.9rem}
+ .card{border:1px solid #2b3a5e;border-radius:12px;background:#111a30;padding:.9rem 1rem;margin:1rem 0}
+ .card h2{font-size:1.1rem;margin:0 0 .15rem;color:#ffd75e}
+ .dev{color:#c9d2ea;font-size:.92rem}
+ .card ol{margin:.5rem 0 .7rem;padding-left:1.3rem;font-size:.92rem;color:#c9d2ea}
+ a.go{display:inline-block;padding:.55rem 1rem;border:1px solid #ffd75e;border-radius:8px;
+      color:#ffd75e;text-decoration:none;font-weight:700}
+ .none{margin:1.5rem 0;color:#9aa4c0}
+</style></head><body>
+<h1>&#127821; Tests</h1>
+<div class="muted">Open each test on the device it names. The steps show again
+on the test itself. Built __BUILD__.</div>
+__CARDS__
+</body></html>
+"""
+
+
+def tests_page():
+    import datetime
+    import html
+    cards = []
+    for name, t in TESTS.items():
+        cards.append(
+            '<div class="card"><h2>%s</h2><div class="dev">Use: %s</div>'
+            '<ol>%s</ol><a class="go" href="%s.html#test=%s%s">Open this test</a></div>'
+            % (html.escape(t["title"]), html.escape(t["device"]),
+               "".join("<li>%s</li>" % html.escape(x) for x in t["steps"]),
+               t["page"], name, t.get("knobs", "")))
+    body = chr(10).join(cards) or '<div class="none">No tests waiting right now.</div>'
+    build = datetime.datetime.now().strftime("%b %d, %I:%M %p")
+    return TESTPAGE.replace("__CARDS__", body).replace("__BUILD__", build)
+
+
 def main():
     if len(sys.argv) != 3:
         sys.exit(__doc__)
@@ -510,6 +554,9 @@ def main():
     with open(os.path.join(dst, "voice_booth.html"), "w",
               encoding="utf-8") as fh:
         fh.write(BOOTH.replace("__CAST__", json.dumps(booth_cast)))
+    with open(os.path.join(dst, "tests.html"), "w", encoding="utf-8") as fh:
+        fh.write(tests_page())
+    print("tests page: %d tests" % len(TESTS))
     here = os.path.dirname(os.path.abspath(__file__))
     shutil.copy2(os.path.join(here, "_worker.js"),
                  os.path.join(dst, "_worker.js"))
