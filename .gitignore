@@ -17,3 +17,6 @@ app_tests/scanned.pdf
 
 # Practice-session notes fetched by read_sessions.py
 .sessions/
+
+# The voice rig: recordings of play text and a throwaway Chrome profile
+.rig/
