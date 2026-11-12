@@ -124,6 +124,11 @@ async function chrome() {
 // record of what the page said and what the recognizer reported.
 const SHIM = `(()=>{
  const ac=new AudioContext(),dest=ac.createMediaStreamDestination(),track=dest.stream.getAudioTracks()[0];
+ // A real microphone never stops sending: silence is still sound frames.
+ // With nothing connected the track sends none, and the recognizer then
+ // neither starts nor times out the way it does on a mic. So silence is
+ // fed all the time, and the recordings play over it.
+ const hush=ac.createConstantSource();hush.offset.value=0;hush.connect(dest);hush.start();
  const R=window.__rig={ac,said:[],ears:[],bufs:{},playing:0,moved:{},spokeEnd:0,tips:[]};
  const now=()=>Math.round(performance.now());
  setInterval(()=>{try{if(typeof pos!=="undefined"&&R.moved[pos]===undefined)R.moved[pos]=now();}catch(_){}},15);
