@@ -1296,10 +1296,21 @@ function wordAloud(l){
  if(!nxt)return;
  nxt.classList.add("show");
  const t=token,w=nxt.textContent;
+ mlog("next word: "+w);
+ // On a computer the ears are NOT cut for the word (2026-11-12). The
+ // browser voice reports a single word finished about a second and a half
+ // after starting it, and with the ears cut for that long, then wiped,
+ // whatever the actor said straight after hearing the word was thrown
+ // away (measured 1.6 s in a test browser; the likely cause of his "it
+ // gets stuck and stops accepting my mic", not yet confirmed by him). So the word is
+ // simply spoken while the ears stay open, the same trade the cues already
+ // make here (seamless, at the cost that speakers may land the word by
+ // themselves). Nothing is cut, restarted or wiped. The iPhone still cuts,
+ // below: a listen left open under the voice goes deaf there.
+ if(!(rec&&rec.listen)){ttsSpeak(w,1,NAME,()=>{});return;}
  judging=false;hush();
  kept=heard;nwSeen=0;
  if(rec)try{rec.abort();}catch(_){/**/}
- mlog("next word: "+w);
  const after=()=>{
   if(t!==token||!running||paused)return;
   if(rec&&!rec.listen)try{rec.abort();}catch(_){/**/}
