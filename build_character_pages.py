@@ -1252,7 +1252,12 @@ function doneEnough(l){
  const hit=E.filter(w=>wordOk(w,S)).length;
  const last=canon(E[E.length-1]);
  const tol=LOOSE.has(last)?(last.length>=6?2:1):(last.length>=5?1:0);
- const like=h=>h===last||(tol&&lev(h,last)<=tol)||(last.length>2&&pkey(h)===pkey(last));
+ // The sound key is letters only, so a number has none: "1981" and "7"
+ // both came out empty and so "matched", and "...in seven years' time. In
+ // 1981." passed at "7 years" (Chris, 2026-11-12). A last word with no
+ // sound key is matched by its own spelling alone.
+ const lk=pkey(last);
+ const like=h=>h===last||(tol&&lev(h,last)<=tol)||(last.length>2&&lk&&pkey(h)===lk);
  // Has the last word been heard AGAIN, after its latest earlier copy?
  // True when the line holds no earlier copy at all.
  const saidAgain=()=>{
