@@ -1228,6 +1228,16 @@ function lev(a,b){if(a===b)return 0;let p=[...Array(b.length+1).keys()];
  for(let i=1;i<=a.length;i++){const c=[i];
   for(let j=1;j<=b.length;j++)c.push(Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]!==b[j-1])));
   p=c;}return p[b.length];}
+// The words that belong to a line's ENDING alone: of its last fifth (six
+// words at least, the last word left out), the ones the line has not used
+// before that stretch begins. Worked out once a line.
+function endZone(l,E){
+ if(l._z&&l._zs===l.say)return l._z;
+ const s=Math.max(0,E.length-1-Math.max(6,Math.ceil(E.length*.2)));
+ const B=soundSets(E.slice(0,s));
+ l._zs=l.say;
+ return l._z=[...new Set(E.slice(s,E.length-1))].filter(w=>!wordOk(w,B));
+}
 // Set by doneEnough when a line is all green but its repeated last word
 // has not been heard again: heardNow then passes it after a quiet beat.
 let greenWait=false,greenT=0;
@@ -1290,6 +1300,20 @@ function doneEnough(l){
  // what is it?" says "it" at word four. The ending only counts once
  // most of the line is behind them. Three words or fewer are exempt.
  if(E.length<=3)return true;
+ // The ending only counts NEAR THE END (Chris, 2026-11-12, working his
+ // monologues slowly on the PC: "the words seem to just auto confirm me to
+ // next line with minimal words said"). His own session notes showed why:
+ // the 66-word door speech passed with 42 words heard at 74%, and the
+ // Cruising speech with 251 words heard for its 57. Working a speech he
+ // repeats phrases and says words that are not in it; the count below
+ // lights every copy of a word, so the line reads 55% well before half
+ // way; and from then on ANY word like the last one opened the gate. So
+ // the words that belong to the ending alone (endZone: the last fifth of
+ // the line) must have been heard: one of them, or two when it has seven
+ // or more. A line whose ending has fewer than three words of its own is
+ // judged as before.
+ const Z=endZone(l,E);
+ if(Z.length>=3&&Z.filter(w=>wordOk(w,S)).length<(Z.length>=7?2:1))return false;
  // A last word that ALSO comes earlier in the line (Chris, 2026-11-12:
  // "...did you? ... will you?" let go at the first "you", ten words into
  // twenty-three; "a machine ... a machine" at the first "machine"). The

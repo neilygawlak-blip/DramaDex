@@ -5,7 +5,11 @@
 //   node rig/rig.mjs CD_RUELLA           smoke run on another page
 //   node rig/rig.mjs CD_HAROLD 911,915   those lines (script positions)
 //   node rig/rig.mjs CD_HAROLD 911,915 whole   ...each taken that way
-//       (whole, nextword, readmine, nextline; a list is used in turn)
+//       (whole, nextword, readmine, nextline, slow; a list is used in turn)
+//   slow = the way he works a monologue: eight words, a four-second
+//   pause, eight more. It reports the moment the line lets go, and every
+//   word the recognizer ever showed as the newest one (its guesses change
+//   as it listens, and a passing guess can open the gate).
 //
 // How (proven 2026-11-12, Chrome 157): the recognizer accepts an audio
 // track in place of the microphone, recognition.start(track). The rig
@@ -114,7 +118,7 @@ async function chrome() {
 // record of what the page said and what the recognizer reported.
 const SHIM = `(()=>{
  const ac=new AudioContext(),dest=ac.createMediaStreamDestination(),track=dest.stream.getAudioTracks()[0];
- const R=window.__rig={ac,said:[],ears:[],bufs:{},playing:0,moved:{},spokeEnd:0};
+ const R=window.__rig={ac,said:[],ears:[],bufs:{},playing:0,moved:{},spokeEnd:0,tips:[]};
  const now=()=>Math.round(performance.now());
  setInterval(()=>{try{if(typeof pos!=="undefined"&&R.moved[pos]===undefined)R.moved[pos]=now();}catch(_){}},15);
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -123,7 +127,10 @@ const SHIM = `(()=>{
    if(!this.__rig){this.__rig=1;
     for(const e of ["start","end","speechstart"])this.addEventListener(e,()=>R.ears.push([now(),e]));
     this.addEventListener("error",x=>R.ears.push([now(),"error:"+x.error]));
-    this.addEventListener("result",x=>{R.results=(R.results||0)+1;R.lastResult=now();});}
+    this.addEventListener("result",x=>{R.results=(R.results||0)+1;R.lastResult=now();
+     let t="";for(let i=0;i<x.results.length;i++)t+=x.results[i][0].transcript+" ";
+     const w=t.trim().toLowerCase().split(" ").filter(x=>x);const tip=w[w.length-1];
+     if(tip&&R.tips[R.tips.length-1]!==tip)R.tips.push(tip);});}
    return start.call(this,track);};
   SR.prototype.abort=function(){R.ears.push([now(),"abort()"]);return abort.call(this);};}
  if(navigator.mediaDevices)navigator.mediaDevices.getUserMedia=async()=>dest.stream.clone();
@@ -169,6 +176,8 @@ try {
   const P = { whole: l => l.say, head: l => l.words.slice(0, 3).join(" "), rest: l => l.words.slice(3).join(" ") };
   const texts = ["next word", "read my line", "next line"];
   for (const l of pick) texts.push(P.whole(l), P.head(l), P.rest(l));
+  const chunks = l => { const c = []; for (let a = 0; a < l.words.length; a += 8) c.push(l.words.slice(a, a + 8).join(" ")); return c; };
+  if ((args[2] || "").includes("slow")) for (const l of pick) texts.push(...chunks(l));
   say(`rig: ${PAGE}, ${pick.length} lines, recording what is new...`);
   record(texts);
   const url = t => "/__wav/" + wavName(t);
@@ -211,6 +220,25 @@ try {
       await tab.until(`__rig.said.length>${saidBefore}&&__rig.said[__rig.said.length-1].end&&judging`, 30000);
       await sleep(400);
       await speakIn(P.whole(l));
+    } else if (way === "slow") {
+      const cs = chunks(l);
+      await tab.ev("__rig.tips=[]");
+      const e0 = await tab.ev("__rig.ears.length");
+      let saidWords = 0, early = "";
+      for (let c = 0; c < cs.length; c++) {
+        await speakIn(cs[c]); saidWords += cs[c].split(" ").length;
+        const last = c === cs.length - 1;
+        if (!last) await sleep(4000);
+        const st = await tab.ev(`JSON.stringify({pos,heard:norm(heard).split(" ").filter(w=>w).length,lit:stage.querySelectorAll("#diff .lit").length})`).then(JSON.parse);
+        if (!last && st.pos > k) { early = `LET GO EARLY after ${saidWords} of ${l.n} words (chunk ${c + 1} of ${cs.length})`; break; }
+        if (!last) say(`     ...after ${saidWords} words and a pause: still on the line, ears hold ${st.heard} words, ${st.lit} lit`);
+      }
+      const ev = await tab.ev(`JSON.stringify(__rig.ears.slice(${e0}).map(e=>e[1]))`).then(JSON.parse);
+      const restarts = ev.filter(e => e === "end").length;
+      const tips = await tab.ev("JSON.stringify(__rig.tips)").then(JSON.parse);
+      const odd = tips.filter(w => !l.words.includes(w.replace(/[^a-z0-9']/g, "")));
+      note = `${restarts} listen(s) ended during it (${[...new Set(ev.filter(e => e.startsWith("error")))].join(", ") || "no errors"}); guesses not in the line: ${[...new Set(odd)].slice(0, 12).join(", ") || "none"}`;
+      if (early) { failed++; say(`FAIL ${head}: ${early}; ${note}`); continue; }
     } else if (way === "nextline") {
       await speakIn(P.head(l));
       await sleep(400);
