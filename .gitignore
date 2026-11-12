@@ -14,3 +14,6 @@ gods_of_comedy*
 .venv-voice/
 
 app_tests/scanned.pdf
+
+# Practice-session notes fetched by read_sessions.py
+.sessions/

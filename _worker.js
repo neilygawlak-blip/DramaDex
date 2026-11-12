@@ -155,11 +155,26 @@ async function miclog(req, env, url) {
   return json({ ok: true });
 }
 
+// One practice session's notes (the line pages send them): outcomes and
+// counts only, no sound and no words said. Kept thirty days under sess/,
+// one key a session, rewritten as the session goes on.
+async function session(req, env, url) {
+  const id = (url.searchParams.get("id") || "")
+    .replace(/[^0-9A-Za-z_-]/g, "").slice(0, 48);
+  const body = await req.text();
+  if (!id || !body || body.length > 150000)
+    return json({ error: "bad session" }, 400);
+  await env.VOICES.put("sess/" + id, body, { expirationTtl: 2592000 });
+  return json({ ok: true });
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (url.pathname === "/api/miclog" && req.method === "POST")
       return miclog(req, env, url);
+    if (url.pathname === "/api/session" && req.method === "POST")
+      return session(req, env, url);
     if (url.pathname === "/api/voice-upload" && req.method === "POST")
       return upload(req, env, url);
     if (url.pathname === "/api/voice-presence") return presence();

@@ -936,7 +936,7 @@ function ttsSpeak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynth
  u.onstart=()=>mlog("cue voice started");
  u.onend=()=>{ttsEnd=performance.now();mlog("cue voice ended");fin1();};u.onerror=fin1;
  const est=1200+t.split(" ").length*430/u.rate;
- const guard=setTimeout(()=>{if(!fin)mlog("cue voice never reported its end");fin1();},est+2500);
+ const guard=setTimeout(()=>{if(!fin){mlog("cue voice never reported its end");SESS.ttsLost++;}fin1();},est+2500);
  ttsKeep=u;speechSynthesis.speak(u);}
 
 function show(l,auto){
@@ -1003,9 +1003,10 @@ function show(l,auto){
   else fetch(SCRIPT_URL).then(r=>r.ok?r.json():Promise.reject(r.status))
    .then(S=>{SCRIPT=S;open(fromScript(S));}).catch(()=>open(fromGaps()));};
  const wb=document.getElementById("wordbtn"),lb=document.getElementById("linebtn");
- if(wb)wb.onclick=()=>{const nxt=stage.querySelector("#diff .pending:not(.lit):not(.show)");
+ if(wb)wb.onclick=()=>{noteHint("wb");const nxt=stage.querySelector("#diff .pending:not(.lit):not(.show)");
   if(nxt)nxt.classList.add("show");};
- if(lb)lb.onclick=()=>stage.querySelectorAll("#diff .pending").forEach(s=>s.classList.add("show"));
+ if(lb)lb.onclick=()=>{noteHint("lb");
+  stage.querySelectorAll("#diff .pending").forEach(s=>s.classList.add("show"));};
  // The mic will not catch everything (Russian, mumbles, loud rooms):
  // Got it is the actor vouching for themselves, and it credits the line
  // exactly as a spoken pass does (Chris, 2026-11-04): the check draws,
@@ -1014,7 +1015,7 @@ function show(l,auto){
  // arrowed back to it, so a line could never be run a second time.
  const gb=document.getElementById("gotbtn");
  if(gb)gb.onclick=()=>{if(!running)return;
-  hush();token++;freshEars();judged(l,l.say);};
+  noteDone(l,"g");hush();token++;freshEars();judged(l,l.say);};
  // Edit This Line: pause, swap the line for a textarea holding the
  // full stored text (directions included), save through the host app
  // so the fix lands in the book — cues, read-through, next sessions.
@@ -1057,6 +1058,55 @@ function setWhere(l){
   +" \\u00b7 line "+(pos+1)+" of "+queue.length;
 }
 let token=0;
+// ---- session notes (Chris, 2026-11-12: "live track all users for bug
+// tests ... not super invasive") ----
+// What a practice session DID, so bugs show without anyone reporting them:
+// each line's outcome, how much of it the ears had caught, the hints used,
+// and what the mic reported. Counts only: no sound, and no word anyone
+// said. Nothing at load; one small send every 25 lines, on pause, at the
+// end of a run and when the page is left. #notrack turns it off.
+//
+// A line is one row:
+//  [script position, outcome, words in the line, % of the line the ears
+//   had caught, words heard, seconds on the line, seconds listening,
+//   Next Word taps, "next word" said, Line taps, "read my line",
+//   "read their line"]
+// outcome: v passed by voice, g Got it, n "next line", a arrow on, b arrow
+// back. A line often finished by g or n with a high % is a gate that will
+// not open; with 0% the mic was not hearing; a v with a low % let go early.
+const TRACK=!/notrack/.test(location.hash)&&location.protocol!=="file:";
+const SESS={v:1,id:new Date().toISOString().slice(0,19).replace(/[:T]/g,"-")
+  +"-"+Math.random().toString(36).slice(2,8),
+ page:NAME,build:"__BUILD__",ua:navigator.userAgent,hash:location.hash,
+ ears:"",hold:0,mode:"",scope:"",runs:0,lines:[],err:{},restarts:0,ttsLost:0};
+let sLine=null,sSent=0,sAt=0;
+function noteErr(k){SESS.err[k]=(SESS.err[k]||0)+1;}
+function noteLine(l){sLine={i:l.i,w:norm(l.say).split(" ").filter(w=>w).length,
+ t:performance.now(),tj:0,wb:0,nw:0,lb:0,rm:0,rt:0};}
+function noteListen(){if(sLine&&!sLine.tj)sLine.tj=performance.now();}
+function noteHint(k){if(sLine)sLine[k]++;}
+function noteDone(l,how){
+ if(!sLine||!l||sLine.i!==l.i)return;
+ const s=sLine,now=performance.now();sLine=null;
+ let r=0,h=0;
+ try{r=Math.round(100*grade(l.say,heard).r);
+  h=norm(heard).split(" ").filter(w=>w).length;}catch(_){/**/}
+ const sec=x=>Math.round((now-x)/100)/10;
+ if(SESS.lines.length<1500)SESS.lines.push([s.i,how,s.w,r,h,sec(s.t),
+  s.tj?sec(s.tj):-1,s.wb,s.nw,s.lb,s.rm,s.rt]);
+ if(SESS.lines.length-sSent>=25)sendSess(false);
+}
+function sendSess(last){
+ if(!TRACK||(!SESS.lines.length&&!sLine))return;
+ const now=Date.now();if(!last&&now-sAt<5000)return;
+ sAt=now;sSent=SESS.lines.length;
+ SESS.secs=Math.round(performance.now()/1000);
+ SESS.open=sLine?[sLine.i,Math.round((performance.now()-sLine.t)/100)/10]:null;
+ const body=JSON.stringify(SESS),url="/api/session?id="+SESS.id;
+ try{if(last&&navigator.sendBeacon&&navigator.sendBeacon(url,body))return;
+  fetch(url,{method:"POST",body,keepalive:true}).catch(()=>{});}catch(_){/**/}
+}
+window.addEventListener("pagehide",()=>sendSess(true));
 // The together moment: partners speak WHILE the actor does. Their clips
 // start, and every loaded text row reveals at the same pace, timed to
 // the longest partner line. Judging (where wanted) is already on.
@@ -1073,7 +1123,7 @@ function myTurn(l,t,auto){
  if(auto){speak(l.say,1.3,NAME,()=>{if(t===token&&running&&!paused)
    setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},500);},l.l);
   startSim(l);}
- else{judging=true;if(rec&&rec.listen)rec.listen();
+ else{judging=true;noteListen();if(rec&&rec.listen)rec.listen();
   // With a mic, the partners wait for the actor's first word: the
   // actor leads the together moment. No mic, nothing to wait for.
   if(rec)simArmed=!!(l.sim&&l.sim.length);else startSim(l);
@@ -1109,12 +1159,13 @@ function step(){
  const t=++token;
  const l=DATA.lines[queue[pos]];heard="";kept="";simArmed=false;
  setWhere(l);
+ if(mode.value!=="listen")noteLine(l);
  if(mode.value==="drill"||mode.value==="quiz"){
   show(l,false);
   const wait=playSfx(l.cue.sfx);
   setTimeout(()=>{if(t!==token||!running||paused)return;
    speak(l.cue.say,l.cue.pace,l.cue.speaker,()=>{if(t!==token||!running||paused)return;
-    judging=true;if(rec&&rec.listen)rec.listen();
+    judging=true;noteListen();if(rec&&rec.listen)rec.listen();
     if(rec)simArmed=!!(l.sim&&l.sim.length);else startSim(l);
     my.textContent=rec?"":"No mic here: say it out loud anyway, then \\u25B6";},l.cue.l);},wait);
  }else{
@@ -1251,16 +1302,19 @@ function start(q){
  loadChime();
  try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u);}catch(_){/**/}
  if(HOLDASK)holdMic();
+ SESS.runs++;SESS.mode=mode.value;SESS.scope=TEST?"test:"+TEST.id:scope.value;
  lockWake();initMic();step();
 }
-function stop(){running=false;unlockWake();startbtn.style.display="";pausebtn.style.display="none";
+function stop(){running=false;sendSess(true);unlockWake();startbtn.style.display="";pausebtn.style.display="none";
  prevbtn.style.display="none";nextbtn.style.display="none";
  if(rec){rec.onend=null;rec.stop();rec=null;}
  dropMic();}
 // The recognizer keeps the whole session's transcript until it is
 // restarted; a restart is how a line comes up blank instead of pre-lit.
 function freshEars(){judging=false;if(rec)try{rec.abort();}catch(_){/**/}}
-function jump(d){if(!running)return;hush();freshEars();
+function jump(d){if(!running)return;
+ if(sLine&&pos<queue.length)noteDone(DATA.lines[queue[pos]],d>0?"a":"b");
+ hush();freshEars();
  // Stepping forward off the last line is how a run ends, not a wall.
  pos=Math.max(0,Math.min(queue.length,pos+d));
  if(paused){paused=false;if(rec)try{rec.start();}catch(_){/**/}}
@@ -1296,6 +1350,7 @@ mode.onchange=()=>{if(running)halt();};
 // its done-callback, which flips judging back on — the page kept
 // listening and reacting while "paused".
 function pause(){if(paused)return;paused=true;token++;judging=false;
+ sendSess(true);
  pausebtn.textContent="\\u25B6";pausebtn.title="resume";
  hush();
  if(rec)try{rec.abort();}catch(_){/**/}
@@ -1349,7 +1404,7 @@ function readAloud(l,theirs){
  const t=token;
  judging=false;hush();
  if(rec)try{rec.abort();}catch(_){/**/}
- mlog(theirs?"read their line":"read my line");
+ mlog(theirs?"read their line":"read my line");noteHint(theirs?"rt":"rm");
  my.textContent=theirs?"Reading their line.":"Reading your line.";
  const after=()=>{
   if(t!==token||!running||paused)return;
@@ -1381,7 +1436,7 @@ function wordAloud(l){
  if(!nxt)return;
  nxt.classList.add("show");
  const t=token,w=nxt.textContent;
- mlog("next word: "+w);
+ mlog("next word: "+w);noteHint("nw");
  // On a computer the ears are NOT cut for the word (2026-11-12). The
  // browser voice reports a single word finished about a second and a half
  // after starting it, and with the ears cut for that long, then wiped,
@@ -1416,7 +1471,7 @@ function heardNow(text){
  // last two words only, so a script line holding "next" never fires it.
  const W=norm(heard).split(" ").filter(w=>w);
  if(W.length>=2&&W[W.length-2]==="next"&&W[W.length-1]==="line"){
-  hush();token++;freshEars();judged(l,l.say);return;}
+  noteDone(l,"n");hush();token++;freshEars();judged(l,l.say);return;}
  // "read my line", as the last three words heard, has the page say the
  // current line aloud (Chris, 2026-11-11: the second hands-free command).
  // The phrase is in none of the plays' text.
@@ -1445,7 +1500,7 @@ function heardNow(text){
  }
  if(simArmed&&heard.trim()){simArmed=false;startSim(l);}
  lightUp(heard);
- if(doneEnough(l)){try{rec.abort();}catch(_){/**/}judged(l,heard);setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);return;}
+ if(doneEnough(l)){noteDone(l,"v");try{rec.abort();}catch(_){/**/}judged(l,heard);setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);return;}
  // After the lighting, so the word given is the first one still dark.
  if(askWord)wordAloud(l);
 }
@@ -1517,10 +1572,10 @@ function holdMic(){
    noiseSuppression:false,autoGainControl:false}})
   .then(s=>{
    if(!micAsked){s.getTracks().forEach(t=>t.stop());return;}
-   micHold=s;micAsked=false;mlog("mic held open");
+   micHold=s;micAsked=false;SESS.hold=1;mlog("mic held open");
    s.getTracks().forEach(t=>{t.onended=()=>{mlog("held mic ended by itself");
     if(micHold===s)micHold=null;};});})
-  .catch(e=>{micAsked=false;micDead=true;mlog("mic hold failed: "+e.name);});
+  .catch(e=>{micAsked=false;micDead=true;noteErr("hold-"+e.name);mlog("mic hold failed: "+e.name);});
 }
 function dropMic(){
  micAsked=false;
@@ -1545,7 +1600,7 @@ function iosEars(SR){
   r.onresult=e=>{if(cur!==r||r.old){mlog("#"+id+" result ignored (old)");return;}let t="";
    for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript+" ";
    last=t;mlog("#"+id+" heard: "+t.trim());heardNow(carry+t);};
-  r.onerror=e=>{mlog("#"+id+" error: "+e.error);
+  r.onerror=e=>{mlog("#"+id+" error: "+e.error);if(e.error!=="aborted")noteErr(e.error);
    if(e.error==="not-allowed"||e.error==="service-not-allowed"){rec=null;
     if(judging)my.textContent="No mic here: say it out loud anyway, then "+String.fromCharCode(9654);}};
   r.onend=()=>{mlog("#"+id+(r.old?" ended (old)":" ended"));
@@ -1553,7 +1608,7 @@ function iosEars(SR){
    if(!r.old)carry+=last;last="";
    settled("listen ended");
    if(live())prime("after an ending");};
-  try{r.start();mlog("#"+id+" open "+why+(B?"":" [a]"));}
+  try{r.start();SESS.restarts++;mlog("#"+id+" open "+why+(B?"":" [a]"));}
   catch(x){mlog("#"+id+" open failed: "+x.name);cur=null;}
  }
  // A spoken phrase comes before every listen. The cue itself is that
@@ -1594,8 +1649,8 @@ function iosEars(SR){
 }
 function initMic(){
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(!SR||location.protocol==="file:"){rec=null;return;}
- if(IOSMIC){rec=IOSEARS||(IOSEARS=iosEars(SR));mlog("iPhone ears");return;}
+ if(!SR||location.protocol==="file:"){rec=null;SESS.ears="none";return;}
+ if(IOSMIC){rec=IOSEARS||(IOSEARS=iosEars(SR));SESS.ears="iphone";mlog("iPhone ears");return;}
  rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang="en-US";
  // Deliberately simple (reverted Aug 11 after two smarter versions felt
  // laggy and unreliable): the whole session transcript counts. The known
@@ -1611,13 +1666,14 @@ function initMic(){
  rec.onstart=()=>mlog("pc listening");
  rec.onaudiostart=()=>{mlog("pc mic open");holdMic();};
  rec.onaudioend=()=>mlog("pc mic closed");
- rec.onerror=e=>{mlog("pc error: "+e.error);
+ rec.onerror=e=>{mlog("pc error: "+e.error);if(e.error!=="aborted")noteErr(e.error);
   if(e.error==="not-allowed"||e.error==="service-not-allowed"||e.error==="audio-capture"){
   if(rec){rec.onend=null;try{rec.abort();}catch(_){/**/}}rec=null;
   dropMic();
   if(judging)my.textContent="No mic here: say it out loud anyway, then \\u25B6";}};
- rec.onend=()=>{mlog("pc ended");if(running&&!paused&&rec)try{rec.start();}catch(_){/**/}};
- try{rec.start();}catch(_){rec=null;}
+ rec.onend=()=>{mlog("pc ended");SESS.restarts++;if(running&&!paused&&rec)try{rec.start();}catch(_){/**/}};
+ SESS.ears="pc";
+ try{rec.start();}catch(_){rec=null;SESS.ears="none";}
 }
 
 // ---- the test card (a page opened by a test link) ----
