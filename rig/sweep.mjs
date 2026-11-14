@@ -34,6 +34,8 @@ const WORKERS = +(process.env.RIG_WORKERS || 3);
 const CHROME = ["C:/Program Files/Google/Chrome/Application/chrome.exe",
   "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe"].find(p => fs.existsSync(p));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const MIN = process.env.RIG_MIN === "1";
+const LIMIT = +(process.env.RIG_LIMIT || 0);
 
 const args = process.argv.slice(2);
 const VOICE = (args[0] || "david").toLowerCase();
@@ -45,13 +47,13 @@ const ONLY = args[1] && !args[1].startsWith("--") ? args[1].split(",") : null;
 const WAVS = path.join(WORK, "sweepwav_" + VOICE);
 const OUT = path.join(WORK, `sweep_${VOICE}.json`);
 
-const wavName = t => crypto.createHash("sha1").update(t).digest("hex").slice(0, 16) + ".wav";
-function record(texts) {
+const wavName = (t, w) => `w${w}_` + crypto.createHash("sha1").update(t).digest("hex").slice(0, 16) + ".wav";
+function record(texts, w) {
   fs.mkdirSync(WAVS, { recursive: true });
-  const need = [...new Set(texts)].filter(t => !fs.existsSync(path.join(WAVS, wavName(t))));
+  const need = [...new Set(texts)].filter(t => !fs.existsSync(path.join(WAVS, wavName(t, w))));
   if (!need.length) return;
   const job = path.join(WORK, `sweepjob_${VOICE}_${process.pid}_${Math.random().toString(36).slice(2, 7)}.json`);
-  fs.writeFileSync(job, JSON.stringify(need.map(t => ({ text: t, file: path.join(WAVS, wavName(t)) }))));
+  fs.writeFileSync(job, JSON.stringify(need.map(t => ({ text: t, file: path.join(WAVS, wavName(t, w)) }))));
   const ps = `Add-Type -AssemblyName System.Speech;
 $fmt = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000,[System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen,[System.Speech.AudioFormat.AudioChannel]::Mono);
 $jobs = Get-Content -Raw -Encoding UTF8 '${job}' | ConvertFrom-Json;
@@ -107,6 +109,8 @@ async function chrome(w) {
   if (!list) throw new Error("Chrome did not start");
   const ver = await (await fetch(`http://127.0.0.1:${cdp}/json/version`)).json();
   const tab = new Tab(await open(list.find(t => t.type === "page").webSocketDebuggerUrl));
+  if (MIN) try { const { windowId } = await tab.send("Browser.getWindowForTarget");
+    await tab.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "minimized" } }); } catch (e) { console.log("could not minimise: " + e.message); }
   const close = async () => { try { const b = new Tab(await open(ver.webSocketDebuggerUrl)); await Promise.race([b.send("Browser.close"), sleep(1500)]); } catch { /* gone */ } try { proc.kill(); } catch { /* gone */ } };
   return { tab, close };
 }
@@ -126,23 +130,23 @@ const SHIM = `(()=>{
  const nap=ms=>new Promise(r=>setTimeout(r,ms));
  window.__tx=async url=>{
   if(ac.state!=="running"){try{await Promise.race([ac.resume(),nap(1500)]);}catch(_){}}
-  const buf=await ac.decodeAudioData(await (await fetch(url)).arrayBuffer());
+  let buf;try{buf=await ac.decodeAudioData(await (await fetch(url)).arrayBuffer());}catch(x){return {text:"",err:"recording "+x.name};}
   const r=new SR();r.continuous=true;r.interimResults=true;r.lang="en-US";
-  let text="",lastAt=0,err="";
-  r.onresult=e=>{let t="";for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript+" ";text=t;lastAt=performance.now();};
+  let text="",lastAt=0,err="",playing=false,chAt=0,gap=0,lastCh=0;
+  r.onresult=e=>{let t="";for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript+" ";const now=performance.now();if(t.trim()!==text.trim()){if(playing&&chAt)gap=Math.max(gap,now-chAt);chAt=now;lastCh=now;}text=t;lastAt=now;};
   r.onerror=e=>{if(e.error!=="aborted")err=e.error;};
   const seen=[];for(const e of ["start","audiostart","soundstart","speechstart","audioend","end"])r.addEventListener(e,()=>seen.push(e));
   const up=new Promise(res=>{r.addEventListener("audiostart",()=>res(true));r.addEventListener("start",()=>res(true));setTimeout(()=>res(false),5000);});
   try{r.start();}catch(x){return {text:"",err:"start "+x.name};}
   if(!await up){try{r.abort();}catch(_){}return {text:"",err:"no start "+err+" (audio "+ac.state+"; events "+seen.join(",")+"; track "+track.readyState+(track.muted?" muted":"")+"; visible "+document.visibilityState+")"};}
   await nap(250);
-  const s=ac.createBufferSource();s.buffer=buf;s.connect(dest);s.start();
+  const s=ac.createBufferSource();s.buffer=buf;s.connect(dest);s.start();playing=true;
   await new Promise(res=>{s.onended=res;});
-  const tEnd=performance.now();
+  const tEnd=performance.now();playing=false;
   while(performance.now()-tEnd<5000){if(performance.now()-Math.max(lastAt,tEnd)>1200)break;await nap(100);}
   try{r.abort();}catch(_){}
   await nap(200);
-  return {text:text.trim(),err,secs:Math.round(buf.duration*10)/10};};
+  return {text:text.trim(),err,secs:Math.round(buf.duration*10)/10,gap:Math.round(gap),lag:lastCh?Math.round(lastCh-tEnd):null};};
 })();`;
 
 // ---------- the work ----------
@@ -156,52 +160,60 @@ if (FLAGGED) {
 const pages = fs.readdirSync(SITE).filter(f => f.endsWith(".html") && fs.readFileSync(path.join(SITE, f), "utf8").includes("function doneEnough"))
   .map(f => f.replace(".html", "")).filter(p => !ONLY || ONLY.includes(p));
 
+fs.rmSync(WAVS, { recursive: true, force: true });
 const srv = await serve();
 const queue = [...pages];
 let total = 0, flaggedNow = 0, errors = 0;
 const t0 = Date.now();
 async function worker(w) {
-  let browser;
+ for (let restarts = 0; ; ) {
+  let browser, page = null;
   try {
     browser = await chrome(w);
     const tab = browser.tab;
     await tab.send("Page.enable");
     await tab.send("Page.addScriptToEvaluateOnNewDocument", { source: SHIM });
     for (;;) {
-      const page = queue.shift();
-      if (!page) break;
+      page = queue.shift();
+      if (!page) return;
       await tab.send("Page.navigate", { url: `http://127.0.0.1:${PORT}/${page}.html#nochime-notrack-nohold` });
       if (!await tab.until(`typeof DATA!=="undefined"&&document.readyState==="complete"&&window.__tx`, 20000)) { console.log(`${page}: did not load`); errors++; continue; }
       for (const type of ["mousePressed", "mouseReleased"])
         await tab.send("Input.dispatchMouseEvent", { type, x: 5, y: 5, button: "left", clickCount: 1 });
       const lines = await tab.ev(`JSON.stringify(DATA.lines.map((l,k)=>({k,i:l.i,say:l.say})))`).then(JSON.parse);
-      const todo = lines.filter(l => !done[`${page}:${l.i}`] && (!flagged || flagged.has(`${page}:${l.i}`)));
+      let todo = lines.filter(l => !done[`${page}:${l.i}`] && (!flagged || flagged.has(`${page}:${l.i}`)));
+      if (LIMIT) todo = todo.slice(0, LIMIT);
       if (!todo.length) { console.log(`${page}: nothing to do`); continue; }
-      record(todo.map(l => l.say));
+      record(todo.map(l => l.say), w);
       let n = 0;
       for (const l of todo) {
         let r;
         for (let attempt = 0; attempt < 2; attempt++) {
-          r = await tab.ev(`__tx(${JSON.stringify("/__wav/" + wavName(l.say))})`);
+          r = await tab.ev(`__tx(${JSON.stringify("/__wav/" + wavName(l.say, w))})`);
           if (!r.err) break;
           await sleep(1500);                 // a blip: one more go
         }
         const g = r.err ? null : await tab.ev(`(()=>{const g=grade(DATA.lines[${l.k}].say,${JSON.stringify(r.text)});return JSON.stringify({unlit:g.marks.filter(m=>!m.ok).map(m=>m.w),words:g.marks.length});})()`).then(JSON.parse);
-        done[`${page}:${l.i}`] = r.err ? { err: r.err } : { text: r.text, unlit: g.unlit, words: g.words };
+        done[`${page}:${l.i}`] = r.err ? { err: r.err } : { text: r.text, unlit: g.unlit, words: g.words, gap: r.gap, lag: r.lag };
         if (r.err) { errors++; delete done[`${page}:${l.i}`]; if (errors <= 5) console.log(`   ${page}:${l.i} error: ${r.err}`); } else { total++; if (g.unlit.length) flaggedNow++; }
         if (++n % 20 === 0) save();
       }
       save();
-      for (const l of todo) fs.rmSync(path.join(WAVS, wavName(l.say)), { force: true });
+      for (const l of todo) fs.rmSync(path.join(WAVS, wavName(l.say, w)), { force: true });
       console.log(`${page}: ${todo.length} lines done  [${total} so far, ${flaggedNow} with an unlit word, ${errors} errors, ${Math.round((Date.now() - t0) / 60000)} min]`);
     }
   } catch (e) {
     console.log(`worker ${w} stopped: ${e.message}`);
     errors++;
+    if (page) queue.unshift(page);
+    if (++restarts > 8) return;
+    console.log(`worker ${w} starting again`);
   } finally {
     save();
     if (browser) await browser.close();
   }
+  await sleep(2500);
+ }
 }
 await Promise.all(Array.from({ length: Math.min(WORKERS, pages.length) }, (_, w) => worker(w)));
 srv.close();

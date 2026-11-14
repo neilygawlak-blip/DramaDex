@@ -1164,6 +1164,7 @@ function step(){
  const t=++token;
  const l=DATA.lines[queue[pos]];heard="";kept="";simArmed=false;
  setWhere(l);
+ mlog("line "+(pos+1)+" of "+queue.length+" up");
  if(mode.value!=="listen")noteLine(l);
  if(mode.value==="drill"||mode.value==="quiz"){
   show(l,false);
@@ -1572,7 +1573,7 @@ function heardNow(text){
  }
  if(simArmed&&heard.trim()){simArmed=false;startSim(l);}
  lightUp(heard);
- const pass=how=>{noteDone(l,how);try{rec.abort();}catch(_){/**/}judged(l,heard);
+ const pass=how=>{mlog("passed ("+how+")");noteDone(l,how);try{rec.abort();}catch(_){/**/}judged(l,heard);
   setTimeout(()=>{try{if(rec)rec.start();}catch(_){/**/}},300);};
  greenWait=false;
  if(doneEnough(l)){pass("v");return;}
