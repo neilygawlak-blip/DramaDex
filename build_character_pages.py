@@ -379,8 +379,18 @@ HEARD_AS = {
     # "Head porter's" said together comes back as the one word
     # "headquarters" (Chris, 2026-11-12, Harold line 8; the rig showed it
     # three times in three). Both halves take it.
-    "head": ["headquarters"],
-    "porters": ["headquarters"],
+    "head": ["headquarters", "headquarter"],
+    "porters": ["headquarters", "headquarter"],
+    "porter": ["headquarter", "headquarters"],
+    # The sweep (2026-11-14: every line through Chrome's recognizer with two
+    # computer voices) found the recognizer always respells these.
+    "ms": ["miss", "miz"],
+    "ok": ["okay"],
+    "okay": ["ok"],
+    "sgt": ["sergeant"],
+    "mum": ["mom"],
+    "mummy": ["mommy"],
+    "ii": ["to"],          # "two"/"too"/"2" all fold to "to"
 }
 
 PLAYS = {
@@ -843,7 +853,68 @@ function inflOf(base,w){
   ||(lastc==="y"&&(w===cut+"ies"||w===cut+"ied")));// carry -> carried
 }
 const ALIAS=DATA.alias||{};
+// ---- what the recognizer respells (the sweep, 2026-11-14) ----
+// It writes numbers as digits ("ten" comes back "10", "forty-five" "45",
+// "nine o'clock" "9:00", "the fifth" "5th") and joins words the script
+// prints apart ("to-night" comes back "tonight", "J.S." "JS"). Said right,
+// those words stayed blank, the head porter's fault all over (75 and 57
+// lines). So the heard words are given back what was said: after a digit
+// token come the words it is said as, and after a word that is two of the
+// line's own neighbours run together come those two words.
+const N1="zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split(" ");
+const N10="twenty thirty forty fifty sixty seventy eighty ninety".split(" ");
+const NORD={one:"first",two:"second",three:"third",five:"fifth",eight:"eighth",nine:"ninth",twelve:"twelfth"};
+function under100(n){return n<20?[N1[n]]:n%10?[N10[(n/10|0)-2],N1[n%10]]:[N10[(n/10|0)-2]];}
+function numWords(n){
+ if(n<100)return under100(n);
+ if(n<1000){const r=n%100;return [N1[n/100|0],"hundred"].concat(r?["and"].concat(under100(r)):[]);}
+ // a year is said in pairs: nineteen eighty one, nineteen oh five
+ if(n>=1100&&n<2100&&n%1000){const r=n%100;
+  return under100(n/100|0).concat(r?(r<10?["oh"]:[]).concat(under100(r)):["hundred"]);}
+ const r=n%1000;
+ return [N1[n/1000|0],"thousand"].concat(r?(r<100?["and"]:[]).concat(numWords(r)):[]);
+}
+function spoken(tok){
+ if(tok==="00")return ["oclock"];                    // "9:00"
+ const m=/^(\\d{1,4})(st|nd|rd|th)?$/.exec(tok);
+ if(!m)return null;
+ const w=numWords(+m[1]);
+ if(!m[2])return +m[1]?w:w.concat(["oh"]);
+ const last=w[w.length-1];
+ return [m[1]].concat(w.slice(0,-1),
+  [NORD[last]||(last.endsWith("y")?last.slice(0,-1)+"ieth":last+"th")]);
+}
+// E: the line's own words (for the joins); own: the line's words as a set,
+// given when fillers the line does not hold are to be dropped. The result
+// carries .tail, everything that came of the last two words heard, and
+// .last2, those two words themselves: "the last words heard" must not
+// become the tail end of one number's spelling.
+function heardWords(text,E,own){
+ let H=norm(text).split(" ").filter(w=>w);
+ if(own)H=H.filter(w=>!FILLERS.has(w)||own.has(w));
+ let P=null;
+ if(E&&E.length>1){P={};
+  const b=E.map(w=>w.replace(/'/g,""));
+  for(let i=0;i<b.length-1;i++){
+   if(!b[i]||!b[i+1])continue;
+   const two=b[i]+b[i+1];
+   if(two.length>3||(b[i].length===1&&b[i+1].length===1))P[two]=[E[i],E[i+1]];
+   if(i<b.length-2&&b[i].length===1&&b[i+1].length===1&&b[i+2].length===1)
+    P[two+b[i+2]]=[E[i],E[i+1],E[i+2]];}}
+ const out=[],from=[];
+ H.forEach((h,k)=>{
+  out.push(h);from.push(k);
+  const more=(spoken(h)||[]).concat((P&&P[h.replace(/'/g,"")])||[]);
+  for(const x of more){out.push(x);from.push(k);}});
+ out.tail=out.filter((_,i)=>from[i]>=H.length-2);
+ out.last2=H.slice(-2);
+ return out;
+}
 const wordOk=(w,S)=>{w=canon(w);
+ // A quote mark standing alone ("...in seven years ...'") is no word:
+ // nobody can say it, so it is never waited for (2026-11-14; three lines
+ // ended on one and could not pass by voice).
+ if(!w)return true;
  if(S.hset.has(w)||(w.length>2&&S.pset.has(pkey(w))))return true;
  if(/^s+h+$/.test(w)&&SHUSH.some(h=>S.hset.has(h)))return true;
  // The same word in another tense or number (Chris asked 2026-11-05; his
@@ -852,6 +923,7 @@ const wordOk=(w,S)=>{w=canon(w);
  if(w.length>2&&S.hlist.some(h=>inflOf(w,h)||inflOf(h,w)))return true;
  // Known mishearings of this exact script word (HEARD_AS in the build).
  if(ALIAS[w]&&ALIAS[w].some(h=>S.hset.has(h)))return true;
+ if(w.length>3&&S.joins.includes(w))return true;
  // The bounded allowance, for flagged words only: off by one letter
  // (4-5 letters) or two (6+), against heard words or joined pairs.
  if(!LOOSE.has(w))return false;
@@ -865,7 +937,7 @@ function grade(expected,heard){
  // word never arrived, so the line could not pass by voice or draw its
  // check. Fillers the line does not hold are still dropped.
  const E=norm(expected).split(" ").filter(w=>w),own=new Set(E),
-  H=norm(heard).split(" ").filter(w=>!FILLERS.has(w)||own.has(w));
+  H=heardWords(heard,E,own);
  const S=soundSets(H);let hit=0;const marks=E.map(w=>{const ok=wordOk(w,S);if(ok)hit++;return {w,ok};});
  const r=E.length?hit/E.length:1;
  // One tier or silence, by Chris's call: the unlit words already say
@@ -1047,7 +1119,8 @@ function show(l,auto){
  };
 }
 function lightUp(text){
- const S=soundSets(norm(text).split(" "));
+ const l=DATA.lines[queue[pos]];
+ const S=soundSets(heardWords(text,l?norm(l.say).split(" ").filter(w=>w):null));
  stage.querySelectorAll("#diff .pending").forEach(s=>{
   if(wordOk(s.textContent,S))s.classList.add("lit");});
 }
@@ -1248,11 +1321,11 @@ function endZone(l,E){
 // has not been heard again: heardNow then passes it after a quiet beat.
 let greenWait=false,greenT=0;
 function doneEnough(l){
- const E=norm(l.say).split(" ").filter(w=>w);
+ const E=norm(l.say).split(" ").filter(w=>w.replace(/'/g,""));
  if(!E.length)return true;
  // As in grade(): a filler the line itself holds is kept.
  const own=new Set(E);
- const H=norm(heard).split(" ").filter(w=>!FILLERS.has(w)||own.has(w));
+ const H=heardWords(heard,E,own);
  if(!H.length)return false;
  const S=soundSets(H);
  const hit=E.filter(w=>wordOk(w,S)).length;
@@ -1263,7 +1336,8 @@ function doneEnough(l){
  // 1981." passed at "7 years" (Chris, 2026-11-12). A last word with no
  // sound key is matched by its own spelling alone.
  const lk=pkey(last);
- const like=h=>h===last||(tol&&lev(h,last)<=tol)||(last.length>2&&lk&&pkey(h)===lk);
+ const like=h=>h===last||(tol&&lev(h,last)<=tol)||(last.length>2&&lk&&pkey(h)===lk)
+  ||!!(ALIAS[last]&&ALIAS[last].includes(h));
  // Has the last word been heard AGAIN, after its latest earlier copy?
  // True when the line holds no earlier copy at all.
  const saidAgain=()=>{
@@ -1301,11 +1375,11 @@ function doneEnough(l){
  // final word (off-by-a-letter allowed on longer words). Matching
  // anywhere in the transcript let a mid-line stall advance the run the
  // moment an earlier word resembled the ending.
- const tail=H.slice(-2).map(canon);
+ const tail=H.tail.map(canon),last2=H.last2.map(canon);
  let endsRight=tail.some(like);
  // A flagged final word may also arrive split in two ("to varish").
- if(!endsRight&&LOOSE.has(last)&&tail.length===2)
-  endsRight=lev(tail.join(""),last)<=tol;
+ if(!endsRight&&LOOSE.has(last)&&last2.length===2)
+  endsRight=lev(last2.join(""),last)<=tol;
  if(!endsRight)return false;
  // A repeated word must not end the line early: "WE will get it ...
  // what is it?" says "it" at word four. The ending only counts once
