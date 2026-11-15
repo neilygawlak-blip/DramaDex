@@ -657,6 +657,17 @@ TEMPLATE = """<!DOCTYPE html>
  #reportbtn:hover{border-color:#ffd75e;color:#e8e6df}
  #build{position:fixed;bottom:.3rem;left:0;right:0;text-align:center;
       font-size:.58rem;color:#20294a;pointer-events:none}
+ /* Dark screen (2026-11-15): the whole page goes black to save the
+    battery while a run carries on; a double tap brings it back. */
+ #darkbtn{font-size:.85rem;color:#9aa4c0}
+ #dark{display:none;position:fixed;inset:0;z-index:1000;background:#000;
+      touch-action:none;-webkit-user-select:none;user-select:none;
+      -webkit-tap-highlight-color:transparent;cursor:none;
+      align-items:center;justify-content:center}
+ #dark.on{display:flex}
+ #darkhint{color:#777;font-size:1rem;line-height:1.5;text-align:center;
+      padding:0 2rem;opacity:0;transition:opacity .6s}
+ #dark.hint #darkhint{opacity:1}
 </style></head><body>
 <h1>__AVATAR__ __NAME__ <span class="muted">— __PLAY__</span></h1>
 <div class="muted">__COUNT__ lines. Pick a scene, press the pineapple, and
@@ -672,6 +683,7 @@ just speak when it's your turn.</div>
  <label id="voxwrap" style="display:none;font-size:.85rem;color:#9aa4c0">
   <input type="checkbox" id="voxchk" checked> &#127908; Real voices</label>
  <button class="primary" id="startbtn">&#127821; Start</button>
+ <button id="darkbtn" title="black screen to save battery; double tap to bring it back">&#127769; Dark screen</button>
  <span style="white-space:nowrap"><button id="prevbtn" style="display:none"
   title="previous line (left arrow)">&#9664;</button>
  <button id="nextbtn" style="display:none" title="next line (right arrow)">&#9654;</button></span>
@@ -683,6 +695,7 @@ just speak when it's your turn.</div>
 <div id="nailfx"></div>
 <a id="backbtn" href="__HOME__">&#8592; Back to Cast List</a>
 <a id="reportbtn" href="#">&#9888; Tell Neil it broke</a>
+<div id="dark"><div id="darkhint">Dark screen is on.<br>Double tap anywhere to bring the screen back.</div></div>
 <div id="build">build __BUILD__</div>
 <script>
 const DATA=__DATA__;
@@ -1889,6 +1902,34 @@ if(TEST){
  mlog("test "+TEST.id+" opened; held mic "+(HOLD?"on":"off")+"; "
   +(IOSMIC?"iPhone ears":"computer ears")+"; "+TEST.lines.length+" lines, "+TEST.mode);
 }
+// ---- dark screen (Chris, 2026-11-15) ----
+// A phone must stay awake with the page in front for the mic and the voice
+// to work, so the battery goes on a lit screen nobody is looking at. This
+// covers the page in black (black pixels are off on an OLED phone) while
+// the run carries on underneath. One tap shows how to get back; a double
+// tap, or any key, brings the screen back. One tap alone does nothing, so
+// a pocket or a stand cannot undo it or press what is underneath. It also
+// lifts by itself when the run ends.
+(function(){
+ const d=document.getElementById("dark"),b=document.getElementById("darkbtn");
+ if(!d||!b)return;
+ let hintT=0,lastTap=-1e9;
+ const hint=ms=>{d.classList.add("hint");clearTimeout(hintT);
+  hintT=setTimeout(()=>d.classList.remove("hint"),ms);};
+ const off=()=>{clearTimeout(hintT);d.classList.remove("on","hint");};
+ b.onclick=()=>{d.classList.add("on");lastTap=-1e9;hint(4000);b.blur();
+  try{SESS.dark=(SESS.dark||0)+1;}catch(_){/**/}};
+ d.addEventListener("pointerup",e=>{e.preventDefault();
+  const now=performance.now();
+  if(now-lastTap<450){lastTap=-1e9;off();return;}
+  lastTap=now;hint(2500);});
+ d.addEventListener("touchmove",e=>e.preventDefault(),{passive:false});
+ document.addEventListener("keydown",e=>{
+  if(!d.classList.contains("on"))return;
+  e.stopPropagation();e.preventDefault();off();},true);
+ const stop0=stop;
+ stop=function(){off();return stop0.apply(this,arguments);};
+})();
 </script></body></html>
 """
 
@@ -1928,6 +1969,17 @@ READ_TEMPLATE = """<!DOCTYPE html>
  #backbtn:hover{border-color:#ffd75e;color:#e8e6df}
  #build{position:fixed;bottom:.3rem;left:0;right:0;text-align:center;
       font-size:.58rem;color:#20294a;pointer-events:none}
+ /* Dark screen (2026-11-15): the whole page goes black to save the
+    battery while a run carries on; a double tap brings it back. */
+ #darkbtn{font-size:.85rem;color:#9aa4c0}
+ #dark{display:none;position:fixed;inset:0;z-index:1000;background:#000;
+      touch-action:none;-webkit-user-select:none;user-select:none;
+      -webkit-tap-highlight-color:transparent;cursor:none;
+      align-items:center;justify-content:center}
+ #dark.on{display:flex}
+ #darkhint{color:#777;font-size:1rem;line-height:1.5;text-align:center;
+      padding:0 2rem;opacity:0;transition:opacity .6s}
+ #dark.hint #darkhint{opacity:1}
 </style></head><body>
 <div id="top">
 <h1>&#127911; Full Read Through <span class="muted">— __PLAY__</span></h1>
@@ -1940,10 +1992,12 @@ any line to start from there.</div>
 <option value="1.35">Faster</option><option value="1.7">Fastest</option></select>
 <label id="voxwrap"><input type="checkbox" id="voxchk"> &#127908; Real voices</label>
 <button class="primary" id="startbtn">&#127821; Play</button>
+<button id="darkbtn" title="black screen to save battery; double tap to bring it back">&#127769; Dark screen</button>
 </div>
 <div id="script"></div>
 <a id="backbtn" href="__HOME__">&#8592; Back to Cast List</a>
 <button id="pausebtn" title="pause">&#9208;</button>
+<div id="dark"><div id="darkhint">Dark screen is on.<br>Double tap anywhere to bring the screen back.</div></div>
 <div id="build">build __BUILD__</div>
 <script>
 const DATA=__DATA__;
@@ -2168,6 +2222,34 @@ async function lockWake(){try{
  if("wakeLock" in navigator&&!wake){wake=await navigator.wakeLock.request("screen");
   wake.addEventListener("release",()=>{wake=null;});}}catch(_){/**/}}
 function unlockWake(){if(wake){wake.release().catch(()=>{});wake=null;}}
+// ---- dark screen (Chris, 2026-11-15) ----
+// A phone must stay awake with the page in front for the mic and the voice
+// to work, so the battery goes on a lit screen nobody is looking at. This
+// covers the page in black (black pixels are off on an OLED phone) while
+// the run carries on underneath. One tap shows how to get back; a double
+// tap, or any key, brings the screen back. One tap alone does nothing, so
+// a pocket or a stand cannot undo it or press what is underneath. It also
+// lifts by itself when the run ends.
+(function(){
+ const d=document.getElementById("dark"),b=document.getElementById("darkbtn");
+ if(!d||!b)return;
+ let hintT=0,lastTap=-1e9;
+ const hint=ms=>{d.classList.add("hint");clearTimeout(hintT);
+  hintT=setTimeout(()=>d.classList.remove("hint"),ms);};
+ const off=()=>{clearTimeout(hintT);d.classList.remove("on","hint");};
+ b.onclick=()=>{d.classList.add("on");lastTap=-1e9;hint(4000);b.blur();
+  try{SESS.dark=(SESS.dark||0)+1;}catch(_){/**/}};
+ d.addEventListener("pointerup",e=>{e.preventDefault();
+  const now=performance.now();
+  if(now-lastTap<450){lastTap=-1e9;off();return;}
+  lastTap=now;hint(2500);});
+ d.addEventListener("touchmove",e=>e.preventDefault(),{passive:false});
+ document.addEventListener("keydown",e=>{
+  if(!d.classList.contains("on"))return;
+  e.stopPropagation();e.preventDefault();off();},true);
+ const stop0=stop;
+ stop=function(){off();return stop0.apply(this,arguments);};
+})();
 </script></body></html>
 """
 
