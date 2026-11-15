@@ -683,7 +683,7 @@ just speak when it's your turn.</div>
  <label id="voxwrap" style="display:none;font-size:.85rem;color:#9aa4c0">
   <input type="checkbox" id="voxchk" checked> &#127908; Real voices</label>
  <button class="primary" id="startbtn">&#127821; Start</button>
- <button id="darkbtn" title="black screen to save battery; double tap to bring it back">&#127769; Dark screen</button>
+ <button id="darkbtn" title="black screen to save battery; double tap to bring it back">&#128267; Dark screen</button>
  <span style="white-space:nowrap"><button id="prevbtn" style="display:none"
   title="previous line (left arrow)">&#9664;</button>
  <button id="nextbtn" style="display:none" title="next line (right arrow)">&#9654;</button></span>
@@ -695,7 +695,7 @@ just speak when it's your turn.</div>
 <div id="nailfx"></div>
 <a id="backbtn" href="__HOME__">&#8592; Back to Cast List</a>
 <a id="reportbtn" href="#">&#9888; Tell Neil it broke</a>
-<div id="dark"><div id="darkhint">Dark screen is on.<br>Double tap anywhere to bring the screen back.</div></div>
+<div id="dark"><div id="darkhint">Dark screen is on, to save battery.<br>Double tap anywhere to bring the screen back.</div></div>
 <div id="build">build __BUILD__</div>
 <script>
 const DATA=__DATA__;
@@ -1992,12 +1992,12 @@ any line to start from there.</div>
 <option value="1.35">Faster</option><option value="1.7">Fastest</option></select>
 <label id="voxwrap"><input type="checkbox" id="voxchk"> &#127908; Real voices</label>
 <button class="primary" id="startbtn">&#127821; Play</button>
-<button id="darkbtn" title="black screen to save battery; double tap to bring it back">&#127769; Dark screen</button>
+<button id="darkbtn" title="black screen to save battery; double tap to bring it back">&#128267; Dark screen</button>
 </div>
 <div id="script"></div>
 <a id="backbtn" href="__HOME__">&#8592; Back to Cast List</a>
 <button id="pausebtn" title="pause">&#9208;</button>
-<div id="dark"><div id="darkhint">Dark screen is on.<br>Double tap anywhere to bring the screen back.</div></div>
+<div id="dark"><div id="darkhint">Dark screen is on, to save battery.<br>Double tap anywhere to bring the screen back.</div></div>
 <div id="build">build __BUILD__</div>
 <script>
 const DATA=__DATA__;
