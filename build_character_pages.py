@@ -751,8 +751,8 @@ voxchk.onchange=()=>localStorage.setItem("vox",voxchk.checked?"on":"off");
 // Several clips can play at once (together lines), so live audio is a
 // set. Everything that silences the browser voice must also silence
 // every playing clip, or "paused" keeps talking in someone's real voice.
-let liveClips=new Set();
-function hush(){speechSynthesis.cancel();
+let liveClips=new Set(),ttsGen=0,netVoiceOff=0,netFails=0;
+function hush(){ttsGen++;speechSynthesis.cancel();
  liveClips.forEach(a=>{a.onended=null;a.onerror=null;a.pause();});
  liveClips.clear();}
 
@@ -971,8 +971,9 @@ const FEM=/female|zira|hazel|susan|heather|catherine|linda|samantha|karen|serena
 const MASC=/male|david|mark|george|richard|james|ryan|daniel|alex|fred|oliver|thomas|guy|william|sean/i;
 const rank=v=>/natural|neural/i.test(v.name)?0:/google/i.test(v.name)?1:2;
 function pickVoice(p,who){
- const vs=speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en"));
+ let vs=speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en"));
  if(!vs.length)return null;
+ if(performance.now()<netVoiceOff){const own=vs.filter(v=>v.localService);if(own.length)vs=own;}
  const gender=v=>FEM.test(v.name)?"f":MASC.test(v.name)?"m":"?";
  let pool=vs.filter(v=>gender(v)===p.g);
  if(!pool.length)pool=vs;
@@ -1010,7 +1011,7 @@ function speak(t,pace,who,done,lid){
  }
  ttsSpeak(t,pace,who,done);
 }
-function ttsSpeak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynthesisUtterance(t);
+function ttsSpeak(t,pace,who,done,again){if(!t){done();return;}const u=new SpeechSynthesisUtterance(t);
  const p=(DATA.voices&&DATA.voices[who])||{g:"m",style:"casual",mult:1};
  const v=pickVoice(p,who);if(v)u.voice=v;
  let r=(pace||1.3)*(p.mult||1);
@@ -1022,11 +1023,30 @@ function ttsSpeak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynth
  // Chrome swallows utterances queued right after a cancel and sometimes
  // never fires onend at all. Whatever happens to the audio, the run must
  // move: done() is guaranteed, once, by whichever signal arrives first.
- let fin=false;const fin1=()=>{if(!fin){fin=true;clearTimeout(guard);done();}};
- u.onstart=()=>mlog("cue voice started");
+ let fin=false,began=false;const gen=ttsGen,online=!!v&&v.localService===false;
+ const fin1=()=>{if(!fin){fin=true;clearTimeout(guard);clearTimeout(late);done();}};
+ u.onstart=()=>{began=true;if(online)netFails=0;mlog("cue voice started");};
  u.onend=()=>{ttsEnd=performance.now();mlog("cue voice ended");fin1();};u.onerror=fin1;
  const est=1200+t.split(" ").length*430/u.rate;
  const guard=setTimeout(()=>{if(!fin){mlog("cue voice never reported its end");SESS.ttsLost++;}fin1();},est+2500);
+ // Chrome's and Edge's best voices are made online. When the browser
+ // cannot reach them the sentence never starts and never fails, and every
+ // voice after it waits behind it in silence while the run moves on:
+ // "only sound cues worked and voices were hung" (Chris, 2026-11-16;
+ // rig/restart.mjs with RIG_BLOCK=1 shows it). So an online voice that
+ // has not started in four seconds is cancelled, a built-in voice says
+ // the line, and online voices rest: two minutes, longer each time in a
+ // row, back to normal the first time one starts.
+ const late=online&&!again?setTimeout(()=>{
+  if(fin||began||gen!==ttsGen)return;
+  fin=true;clearTimeout(guard);u.onstart=u.onend=u.onerror=null;
+  netFails++;netVoiceOff=performance.now()+Math.min(10,2*netFails)*60000;
+  SESS.ttsFell=(SESS.ttsFell||0)+1;
+  mlog("online voice did not start: a built-in voice takes the line");
+  speechSynthesis.cancel();
+  // A breath between cancel and the next speak, or Chrome eats the speak.
+  setTimeout(()=>{if(gen===ttsGen)ttsSpeak(t,pace,who,done,true);},150);
+ },4000):0;
  ttsKeep=u;speechSynthesis.speak(u);}
 
 function show(l,auto){
@@ -2022,8 +2042,8 @@ spdSel.onchange=()=>{SPD=+spdSel.value;localStorage.setItem("rtspd",spdSel.value
  // A robot voice can't change gears mid-sentence (next line catches
  // up), but a playing clip can: retune it right now.
  liveClips.forEach(a=>{a.playbackRate=SPD;});};
-let liveClips=new Set();
-function hush(){speechSynthesis.cancel();
+let liveClips=new Set(),ttsGen=0,netVoiceOff=0,netFails=0;
+function hush(){ttsGen++;speechSynthesis.cancel();
  liveClips.forEach(a=>{a.onended=null;a.onerror=null;a.pause();});
  liveClips.clear();}
 
@@ -2064,8 +2084,9 @@ const FEM=/female|zira|hazel|susan|heather|catherine|linda|samantha|karen|serena
 const MASC=/male|david|mark|george|richard|james|ryan|daniel|alex|fred|oliver|thomas|guy|william|sean/i;
 const rank=v=>/natural|neural/i.test(v.name)?0:/google/i.test(v.name)?1:2;
 function pickVoice(p,who){
- const vs=speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en"));
+ let vs=speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.startsWith("en"));
  if(!vs.length)return null;
+ if(performance.now()<netVoiceOff){const own=vs.filter(v=>v.localService);if(own.length)vs=own;}
  const gender=v=>FEM.test(v.name)?"f":MASC.test(v.name)?"m":"?";
  let pool=vs.filter(v=>gender(v)===p.g);
  if(!pool.length)pool=vs;
@@ -2079,7 +2100,7 @@ function pickVoice(p,who){
 }
 const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)
  ||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
-function ttsSpeak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynthesisUtterance(t);
+function ttsSpeak(t,pace,who,done,again){if(!t){done();return;}const u=new SpeechSynthesisUtterance(t);
  const p=(DATA.voices&&DATA.voices[who])||{g:"m",style:"casual",mult:1};
  const v=pickVoice(p,who);if(v)u.voice=v;
  let r=(pace||1.3)*(p.mult||1);
@@ -2090,10 +2111,22 @@ function ttsSpeak(t,pace,who,done){if(!t){done();return;}const u=new SpeechSynth
  r*=SPD;
  u.rate=r;
  u.pitch=(v&&rank(v)===0)?1:(p.g==="f"?1.1:.85);
- let fin=false;const fin1=()=>{if(!fin){fin=true;clearTimeout(guard);done();}};
+ let fin=false,began=false;const gen=ttsGen,online=!!v&&v.localService===false;
+ const fin1=()=>{if(!fin){fin=true;clearTimeout(guard);clearTimeout(late);done();}};
+ u.onstart=()=>{began=true;if(online)netFails=0;};
  u.onend=fin1;u.onerror=fin1;
  const est=1200+t.split(" ").length*430/u.rate;
  const guard=setTimeout(fin1,est+2500);
+ // An online voice that cannot be reached never starts and holds every
+ // later voice behind it (see the practice page): after four seconds a
+ // built-in voice says the line and online voices rest.
+ const late=online&&!again?setTimeout(()=>{
+  if(fin||began||gen!==ttsGen)return;
+  fin=true;clearTimeout(guard);u.onstart=u.onend=u.onerror=null;
+  netFails++;netVoiceOff=performance.now()+Math.min(10,2*netFails)*60000;
+  speechSynthesis.cancel();
+  setTimeout(()=>{if(gen===ttsGen)ttsSpeak(t,pace,who,done,true);},150);
+ },4000):0;
  speechSynthesis.speak(u);}
 function speak(t,pace,who,done,lid){
  if(!t){done();return;}

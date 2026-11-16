@@ -97,15 +97,19 @@ def main():
 
     errs = collections.Counter()
     lost = collections.Counter()
+    fell = collections.Counter()
     for s in sessions:
         for k, n in (s.get("err") or {}).items():
             errs[(device(s["ua"]), k)] += n
         if s.get("ttsLost"):
             lost[device(s["ua"])] += s["ttsLost"]
+        if s.get("ttsFell"):
+            fell[device(s["ua"])] += s["ttsFell"]
     print("\nMIC ERRORS: device, error -> count")
     for (dev, k), n in errs.most_common():
         print("  %-12s %-22s %d" % (dev, k, n))
     print("\nVOICE THAT NEVER REPORTED ITS END: %s" % (dict(lost) or "none"))
+    print("ONLINE VOICE THAT DID NOT START, BUILT-IN VOICE TOOK THE LINE: %s" % (dict(fell) or "none"))
 
     stuck = collections.defaultdict(list)   # finished by hand: the % caught
     early = collections.defaultdict(list)   # passed by voice below 70%
