@@ -419,6 +419,10 @@ PLAYS = {
         "cast": "private/communicating_doors/cast_communicating_doors.txt",
         "prefix": "CD_", "home": "communicating_doors.html",
         "acts": 2,
+        # Shown small beside the play's name on its button and its page
+        # titles (Chris, 2026-11-16): the production moved every year
+        # twelve on, private/communicating_doors/production_changes.tsv.
+        "note": "Present Year 2026",
         # Printed pages: Act One opens on p.7 and ends on p.62, Act Two
         # runs p.63 to the END OF PLAY on p.112.
         "act_pages": {"Act I": (7, 62), "Act II": (63, 112)},
@@ -426,6 +430,14 @@ PLAYS = {
         "avatars": CD_AVATARS, "voices": CD_VOICES, "sfx": CD_SFX,
     },
 }
+
+
+def year_tag(cfg):
+    """The play's small note for a page title, e.g. (Present Year 2026)."""
+    if not cfg.get("note"):
+        return ""
+    return (' <small style="font-size:.72em;font-weight:normal;opacity:.8">'
+            '(%s)</small>' % cfg["note"])
 
 
 def spoken(text, speaker):
@@ -669,7 +681,7 @@ TEMPLATE = """<!DOCTYPE html>
       padding:0 2rem;opacity:0;transition:opacity .6s}
  #dark.hint #darkhint{opacity:1}
 </style></head><body>
-<h1>__AVATAR__ __NAME__ <span class="muted">— __PLAY__</span></h1>
+<h1>__AVATAR__ __NAME__ <span class="muted">— __PLAY____YEARTAG__</span></h1>
 <div class="muted">__COUNT__ lines. Pick a scene, press the pineapple, and
 just speak when it's your turn.</div>
 <div id="controls">
@@ -2038,7 +2050,7 @@ READ_TEMPLATE = """<!DOCTYPE html>
  #dark.hint #darkhint{opacity:1}
 </style></head><body>
 <div id="top">
-<h1>&#127911; Full Read Through <span class="muted">— __PLAY__</span></h1>
+<h1>&#127911; Full Read Through <span class="muted">— __PLAY____YEARTAG__</span></h1>
 <div class="muted">The whole play, performed aloud. Press play, or tap
 any line to start from there.</div>
 <select id="scope"></select>
@@ -2353,6 +2365,7 @@ def build_read_through(speeches, outdir, build, cfg):
             "avatars": cfg["avatars"]}
     html = (READ_TEMPLATE
             .replace("__BUILD__", build)
+            .replace("__YEARTAG__", year_tag(cfg))
             .replace("__PLAY__", cfg["title"])
             .replace("__HOME__", cfg["home"])
             .replace("__DATA__", json.dumps(data, ensure_ascii=False)))
@@ -2439,6 +2452,7 @@ def build_play(cfg, outdir):
                 .replace("__TESTS__", json.dumps(tests_for(stem, lines)))
                 .replace("__AVATAR__", cfg["avatars"].get(name, ""))
                 .replace("__NAME__", name)
+                .replace("__YEARTAG__", year_tag(cfg))
                 .replace("__PLAY__", cfg["title"])
                 .replace("__HOME__", cfg["home"])
                 .replace("__COUNT__", str(len(lines)))

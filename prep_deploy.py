@@ -197,7 +197,7 @@ PLAYPAGE = """<!DOCTYPE html>
    box-shadow:0 2px 8px rgba(0,0,0,.5)}
  #backbtn:hover{border-color:#ffd75e;color:#e8e6df}
 </style></head><body>
-<h1>&#127821; __TITLE__ <small>by __AUTHOR__</small></h1>
+<h1>&#127821; __TITLE__ <small>by __AUTHOR____YEARNOTE__</small></h1>
 <div class="intro">
 <p>Pick a scene, press the pineapple. Speak your line when the cue
 finishes; it moves on when you land your last word.</p>
@@ -206,6 +206,9 @@ line in rehearsal. Arrow keys skip around.</p>
 <p>Practice with <b>just Cue Lines</b>, or <b>Full scene</b> plays
 everyone else and waits for you; or <b>Listen through</b> the whole
 thing in your car.</p>
+<p>First learning them? <b>My Lines Only</b> reads just your lines, in
+order, and names who speaks before each one. Nothing to say back; just
+listen.</p>
 <div class="hfhead">Hands-Free Mode - Voice Commands</div>
 <div class="hfrow">
  <div class="hfbox"><b>&ldquo;Next word&rdquo;</b>Says the next word of
@@ -216,6 +219,11 @@ thing in your car.</p>
  loud, then waits for you to say it.</div>
  <div class="hfbox"><b>&ldquo;Read their line&rdquo;</b>Repeats the line
  before yours, then waits for you.</div>
+</div>
+<div class="hfhead">Saving Battery</div>
+<div class="hfrow">
+ <div class="hfbox"><b>&#128267; Dark screen</b>Turns the screen black
+ while practice keeps running. Double tap anywhere to bring it back.</div>
 </div>
 </div>
 __LINKS__
@@ -529,7 +537,9 @@ def main():
             for i, r in enumerate(["I", "II", "III"][:cfg["acts"]], 1))
         links.insert(1, '<div class="subacts">%s</div>\n'
                         '<hr class="castbreak">' % acts)
+        note = " (%s)" % cfg["note"] if cfg.get("note") else ""
         html = (PLAYPAGE.replace("__TITLE__", cfg["title"])
+                        .replace("__YEARNOTE__", note)
                         .replace("__AUTHOR__", cfg["author"])
                         .replace("__LINKS__", "\n".join(links)))
         with open(os.path.join(dst, cfg["home"]), "w",
@@ -537,8 +547,8 @@ def main():
             fh.write(html)
         npages += len(mine)
         playlinks.append(
-            '<a class="play" href="%s"><b>%s</b><span>by %s</span></a>'
-            % (cfg["home"], cfg["title"], cfg["author"]))
+            '<a class="play" href="%s"><b>%s</b><span>by %s%s</span></a>'
+            % (cfg["home"], cfg["title"], cfg["author"], note))
     with open(os.path.join(dst, "index.html"), "w", encoding="utf-8") as fh:
         fh.write(INDEX.replace("__PLAYLINKS__", "\n".join(playlinks)))
     # The director's workbench ships behind the same gate as the cast.
