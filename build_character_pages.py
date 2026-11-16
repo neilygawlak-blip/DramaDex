@@ -679,6 +679,7 @@ just speak when it's your turn.</div>
   <option value="drill">Cue Lines Only (in order)</option>
   <option value="quiz">Cue Lines Random (quiz challenge)</option>
   <option value="listen">Full Read Through</option>
+  <option value="mine">My Lines Only (read to you)</option>
  </select>
  <label id="voxwrap" style="display:none;font-size:.85rem;color:#9aa4c0">
   <input type="checkbox" id="voxchk" checked> &#127908; Real voices</label>
@@ -1246,6 +1247,40 @@ function showGap(g){
   (g.x?"\\u{1F514} ":"")+
   (g.s?'<span class="cuename">'+av+" "+g.s+'.</span> ':"")+esc(g.t)+'</div>';
 }
+// ---- My Lines Only (Chris, 2026-11-16, from an actress in the cast who
+// has learned lines the old way for years) ----
+// A first-learning pass: every one of the actor's lines read aloud in
+// order, and between them a beat where someone else speaks, never their
+// words. The beat is the name of whoever speaks last before the line,
+// said in that character's voice, then any sound cue that falls there
+// (the doorbell before "Security"). Nothing is asked of the actor, so no
+// mic is opened and nothing is judged: it can run in a pocket or a car.
+function showMine(l,who,bell,now){
+ const av=who&&DATA.avatars&&DATA.avatars[who]||"";
+ const myAv=(DATA.avatars&&DATA.avatars[NAME])||"";
+ stage.innerHTML='<div class="cue">'+(bell?"\\u{1F514} ":"")+
+  (who?'<span class="cuename">'+av+" "+who+'.</span>':"")+'</div>'+
+  (now?'<div class="mine"><span class="cuename">'+myAv+" "+NAME+'.</span> '+esc(l.say)+'</div>':"");
+}
+function playMine(l,t){
+ if(t!==token||!running||paused)return;
+ const live=()=>t===token&&running&&!paused;
+ const gap=l.gap||[];
+ // The last speech before the line that has a speaker, and every sound
+ // from there to the line (a sound may sit in a direction after it).
+ let k=gap.length-1;while(k>0&&!gap[k].s)k--;
+ const who=(gap[k]&&gap[k].s)||l.cue.speaker||"";
+ const bells=gap.slice(Math.max(0,k)).map(g=>g.x).filter(x=>x);
+ if(!bells.length&&l.cue.sfx)bells.push(l.cue.sfx);
+ showMine(l,who,bells.length,false);
+ const line=()=>{if(!live())return;showMine(l,who,bells.length,true);
+  speak(l.say,1.3,NAME,()=>{if(live())setTimeout(()=>{if(live()){pos++;step();}},500);},l.l);};
+ const ring=n=>{if(!live())return;
+  if(n>=bells.length){setTimeout(line,250);return;}
+  setTimeout(()=>ring(n+1),playSfx(bells[n])||300);};
+ if(who)ttsSpeak(who.charAt(0)+who.slice(1).toLowerCase(),1.1,who,()=>ring(0));
+ else setTimeout(()=>ring(0),400);
+}
 function playGap(l,k,t,auto){
  if(t!==token||!running||paused)return;
  const gap=l.gap||[];
@@ -1271,8 +1306,9 @@ function step(){
  const l=DATA.lines[queue[pos]];heard="";kept="";simArmed=false;
  setWhere(l);
  mlog("line "+(pos+1)+" of "+queue.length+" up");
- if(mode.value!=="listen")noteLine(l);
- if(mode.value==="drill"||mode.value==="quiz"){
+ if(mode.value!=="listen"&&mode.value!=="mine")noteLine(l);
+ if(mode.value==="mine"){playMine(l,t);}
+ else if(mode.value==="drill"||mode.value==="quiz"){
   show(l,false);
   const wait=playSfx(l.cue.sfx);
   setTimeout(()=>{if(t!==token||!running||paused)return;
@@ -1480,9 +1516,9 @@ function start(q){
  if(AC.state==="suspended")AC.resume();
  loadChime();
  try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u);}catch(_){/**/}
- if(HOLDASK)holdMic();
+ if(HOLDASK&&mode.value!=="mine")holdMic();
  SESS.runs++;SESS.mode=mode.value;SESS.scope=TEST?"test:"+TEST.id:scope.value;
- lockWake();initMic();step();
+ lockWake();if(mode.value!=="mine")initMic();step();
 }
 function stop(){running=false;sendSess(true);unlockWake();startbtn.style.display="";pausebtn.style.display="none";
  prevbtn.style.display="none";nextbtn.style.display="none";
@@ -1538,7 +1574,7 @@ function pause(){if(paused)return;paused=true;token++;judging=false;
 function resume(){if(!paused)return;paused=false;autoPaused=false;
  pausebtn.textContent="\\u23F8";pausebtn.title="pause";
  my.textContent="";
- if(HOLDASK)holdMic();
+ if(HOLDASK&&mode.value!=="mine")holdMic();
  if(rec)try{rec.start();}catch(_){/**/}
  step();}
 pausebtn.onclick=()=>{paused?resume():pause();};
