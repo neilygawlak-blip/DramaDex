@@ -198,6 +198,10 @@ try {
   const speakIn = async t => tab.ev(`__rig.say(${JSON.stringify(url(t))})`);
 
   await tab.ev(`(()=>{const idx=${JSON.stringify(pick.map(l => l.k))};currentSet=()=>idx;mode.value="drill";})()`);
+  // Count every time the page asks for the "line landed" chime (the sound
+  // itself is off here, #nochime), so RIG_DEBUG can say which lines got it.
+  await tab.ev(`(()=>{window.__chimes=0;const c=chime;chime=function(){window.__chimes++;return c.apply(this,arguments);};})()`);
+  let chimes = 0;
   await tab.click("#startbtn");
   const ua = await tab.ev("navigator.userAgent");
   say("chrome: " + (/Chrome\/[\d.]+/.exec(ua) || [""])[0] + ", real recognition, audio fed as a track");
@@ -286,6 +290,9 @@ try {
       const d = await tab.ev(`JSON.stringify({text:__rig.text,unlit:grade(DATA.lines[${l.k}].say,__rig.text||"").marks.filter(m=>!m.ok).map(m=>m.w)})`).then(JSON.parse);
       console.log(`     recognizer wrote: ${(d.text || "(nothing)").trim()}`);
       console.log(`     left unlit: ${d.unlit.join(", ") || "nothing"}`);
+      const now = await tab.ev("window.__chimes");
+      console.log(`     chime asked for: ${now > chimes ? "yes" : "no"}`);
+      chimes = now;
     }
     // On the page's own clock: when the run moved on, against when the last
     // recording ended. Negative means it let go before the words were out.

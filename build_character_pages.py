@@ -1359,8 +1359,13 @@ function judged(l,text){
  judging=false;const g=grade(l.say,text);
  // The check floats OVER the run: the next line starts underneath it
  // immediately, and it draws, lingers a beat, and fades on its own.
+ // The chime is for every line that passes (Chris, 2026-11-17: it "doesnt
+ // trigger when completing a line"). It used to sit with the check, at 90%
+ // of the words caught, while a line moves on at 55%: his session notes
+ // had 685 of 1,713 voice passes moving on in silence, and nine of
+ // Harold's lines never once reaching it. The drawn check keeps its 90%.
+ chime();
  if(g.nailed){
-  chime();
   const fx=document.getElementById("nailfx");
   fx.innerHTML='<svg viewBox="0 0 52 52">'+
    '<circle class="ccirc" cx="26" cy="26" r="24"/>'+
