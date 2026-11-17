@@ -1374,6 +1374,10 @@ function playGap(l,k,t,auto){
 // full run on this page is more than 90 days old are dropped, here and on
 // the site, so a repeat of the play starts a new tracking point.
 const PAGEKEY=(location.pathname.split("/").pop()||"").split(".")[0]||NAME;
+// Where the bests are kept besides this browser; "" for nowhere. The cast
+// site keeps them against the Access sign-in. The public app's sign-in
+// build points this at its own store (build_deck.py).
+const BESTS_URL=TRACK?"/api/bests?page="+PAGEKEY:"";
 const BKEY="bests:"+PAGEKEY,BFRESH=90*86400000;
 let BESTS={},bSeen=0;
 try{bSeen=+localStorage.getItem(BKEY+":seen")||0;
@@ -1392,12 +1396,12 @@ function bestTake(j){
    runs:Math.max(a.runs||0,b.runs||0),at:top.at};}
  bestKeep(+j.seen||0);
 }
-if(TRACK)fetch("/api/bests?page="+PAGEKEY).then(r=>r.ok?r.json():null)
+if(BESTS_URL)fetch(BESTS_URL).then(r=>r.ok?r.json():null)
  .then(j=>{if(j)bestTake(j);}).catch(()=>{});
 // One finished run against the best so far. Answers what to mark on the
 // score and the time: "new", "tie" (matched: still worth
 // a good word, his call), "first", or "" with the best to show beside it.
-function bestRun(set,now){
+function bestRun(set,now,more){
  const old=BESTS[set],m={p:"",t:"",c:"",old};
  if(!old){m.p="first";BESTS[set]=now;}
  else{
@@ -1408,8 +1412,10 @@ function bestRun(set,now){
   BESTS[set]={pct:top.pct,mine:top.mine,clean:Math.max(old.clean||0,now.clean),of:now.of,
    runs:(old.runs||0)+1,at:top.at};}
  bestKeep(Date.now());
- if(TRACK)fetch("/api/bests?page="+PAGEKEY,{method:"POST",keepalive:true,
-  body:JSON.stringify({set,pct:now.pct,mine:now.mine,clean:now.clean,of:now.of})})
+ // `more` rides along for a store that keeps a log of runs (the public
+ // app's); the cast site's store reads only the five it knows.
+ if(BESTS_URL)fetch(BESTS_URL,{method:"POST",keepalive:true,
+  body:JSON.stringify(Object.assign({set,pct:now.pct,mine:now.mine,clean:now.clean,of:now.of},more||{}))})
   .then(r=>r.ok?r.json():null).then(j=>{if(j)bestTake(j);}).catch(()=>{});
  return m;
 }
@@ -1487,7 +1493,8 @@ function showReport(what){
    const full=!R.part&&rows.length===queue.length&&!TEST;
    const secs=Math.round(R.mine/1000);
    const B=full?bestRun(scope.value+"|"+mode.value+"|"+queue.length,
-    {pct,mine:secs,clean,of:rows.length,runs:1,at:new Date().toISOString().slice(0,10)}):{p:"",t:"",c:""};
+    {pct,mine:secs,clean,of:rows.length,runs:1,at:new Date().toISOString().slice(0,10)},
+    {secs:Math.round((performance.now()-R.t0-R.idle)/1000),skips:skipped,asks:R.nw}):{p:"",t:"",c:""};
    const o=B.old;
    h+='<div class="rstats">'
     +stat(pct+"%","of your words right",B.p,

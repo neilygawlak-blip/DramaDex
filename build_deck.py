@@ -45,6 +45,7 @@ import json
 import os
 import re
 import shutil
+import sys
 
 from build_character_pages import READ_TEMPLATE, TEMPLATE, chime_b64
 
@@ -94,9 +95,21 @@ DEMOSAY = r'''function demoSay(l){
 '''
 
 
-def product(t, kind, demo=False):
+# Sign-in build only: a quiet way out, for a shared computer. Goes into the
+# paid page's shell just before it draws the shelf.
+SIGNOUT = """fetch("/api/me").then(r=>r.json()).then(j=>{if(!j.in)return;
+ const a=document.createElement("a");a.href="#";a.className="muted";
+ a.style.cssText="display:block;margin-top:1.6rem;font-size:.8rem";
+ a.textContent="Sign out of DramaDeck on this device";
+ a.onclick=e=>{e.preventDefault();fetch("/api/signout",{method:"POST"}).then(()=>location.reload());};
+ $("home").appendChild(a);}).catch(()=>{});
+"""
+
+
+def product(t, kind, demo=False, sync=False):
     """The cast site's page made into the product's: kind is "practice" or
-    "read"; demo=True is the practice page of the free demo."""
+    "read"; demo=True is the practice page of the free demo; sync=True is
+    the sign-in build's, whose bests also go to the buyer's account."""
     def cut(frag, repl="", n=1):
         nonlocal t
         assert t.count(frag) == n, "expected %d of %.70r, found %d" % (n, frag, t.count(frag))
@@ -129,6 +142,12 @@ def product(t, kind, demo=False):
             "const PAGEKEY=document.title;")
         cut('const key="rep:"+NAME+":"+scope.value+":"+mode.value;',
             'const key="rep:"+PAGEKEY+":"+scope.value+":"+mode.value;')
+        if sync:
+            # Signed in, the bests (and a log of finished runs) follow the
+            # buyer: private/deck/_worker.js keeps them. Not signed in, the
+            # store answers no and the browser's own copy carries on.
+            cut('const BESTS_URL=TRACK?"/api/bests?page="+PAGEKEY:"";',
+                'const BESTS_URL="/api/sync?page="+encodeURIComponent(PAGEKEY);')
         # No test links, and no separate copy of the script to fetch: Full
         # Script is rebuilt from the lines the page already holds.
         cut("const TESTS=__TESTS__;", "const TESTS={};")
@@ -186,7 +205,11 @@ def read(name):
 
 
 def main():
-    practice = product(TEMPLATE, "practice")
+    # --signin builds the version with sign-in by purchase and synced
+    # scores (the worker, the sign-in page, the changed Privacy and Terms).
+    # Without it the build is the site as it is live: files only.
+    signin = "--signin" in sys.argv[1:]
+    practice = product(TEMPLATE, "practice", sync=signin)
     practice_demo = product(TEMPLATE, "practice", demo=True)
     readthru = product(READ_TEMPLATE, "read")
     # "</" must not appear raw inside the host <script>: a literal
@@ -197,8 +220,13 @@ def main():
     shell = read("shell.html")
     demo_plays = json.dumps(json.loads(read("demo_plays.json")), ensure_ascii=False).replace("</", "<\\/")
 
-    def fill(page, demo):
+    def fill(page, demo, last=""):
         out = shell
+        if last:
+            nl = chr(10)
+            tail = "renderShelf();" + nl + "</script></body></html>"
+            assert out.rstrip().endswith(tail), "the shell no longer ends where it did"
+            out = out.rstrip()[:-len(tail)] + last + tail + nl
         for ph, val in (("__PRACTICE_T__", js_str(page)), ("__READ_T__", js_str(readthru)),
                         ("__COMMON__", json.dumps(common)), ("__DEMO__", demo)):
             assert out.count(ph) == 1, ph
@@ -227,11 +255,16 @@ def main():
         os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(vendor) for f in fs) // 2**20))
     pages = {
         "index.html": read("landing.html"),
-        "privacy.html": read("privacy.html"),
-        "terms.html": read("terms.html"),
+        "privacy.html": read("privacy_signin.html" if signin else "privacy.html"),
+        "terms.html": read("terms_signin.html" if signin else "terms.html"),
         "demo.html": fill(practice_demo, demo_plays),
-        paid: fill(practice, "null"),
+        paid: fill(practice, "null", SIGNOUT if signin else ""),
     }
+    if signin:
+        pages["signin.html"] = read("signin.html")
+        worker = read("_worker.js")
+        assert worker.count('"/__PAID__/"') == 1
+        pages["_worker.js"] = worker.replace("__PAID__", os.path.dirname(paid))
     for name, html in pages.items():
         with open(os.path.join(OUT, name), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(html)
@@ -239,6 +272,8 @@ def main():
         print("deck_site/%-16s %4d KB" % (shown, len(html.encode("utf-8")) // 1024))
     print("practice page lifted from the cast site: %d KB (%d KB with our notes)"
           % (len(practice) // 1024, len(TEMPLATE) // 1024))
+    print("SIGN-IN BUILD: needs the DECK store and its secrets, see private/deck/_worker.js"
+          if signin else "plain build: the site as it is live")
 
 
 if __name__ == "__main__":
