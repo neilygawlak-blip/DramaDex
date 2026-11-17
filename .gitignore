@@ -20,3 +20,6 @@ app_tests/scanned.pdf
 
 # The voice rig: recordings of play text and a throwaway Chrome profile
 .rig/
+
+# The public app's built site (build_deck.py); the paid page's name is a buyer's link
+deck_site/
