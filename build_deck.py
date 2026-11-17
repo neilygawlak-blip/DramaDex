@@ -15,6 +15,7 @@ the paid product, and this repo is public):
   shell.html       the app around the practice page: shelf, import, cast
   demo_plays.json  what the free demo is seeded with (Trifles, public domain)
   landing.html, privacy.html, terms.html
+  vendor/          the import's libraries: pdf.js, Tesseract, its English data
 These were RECOVERED from the live site on 2026-11-17: the folder they were
 written in was never committed and is not on this PC. shell.html is the
 live demo page with its two embedded practice pages, word list and demo
@@ -25,23 +26,25 @@ build_app.py and app/ are the August ancestor and are no longer what ships.
 Out, in deck_site/ (not committed):
   index.html   the landing page
   demo.html    the shell with the demo plays; lines fill themselves, no mic
-  <paid>.html  the shell with nothing seeded: the product. Its file name is
-               the buyer's link, so it is not written here: it is read from
-               private/deck_app_name.txt (default app.html).
+  <paid>/index.html  the shell with nothing seeded: the product, with its
+               vendor/ beside it. The folder's name is the buyer's link, so
+               it is not written here: it is read from
+               private/deck_app_name.txt.
   privacy.html, terms.html
 
-PUBLISHING. `wrangler pages deploy` replaces the WHOLE site, and the paid
-page's real address was not known on 2026-11-17 (it is not linked from any
-public page), so a production publish from here would erase the page
-buyers use. Until that address is in private/deck_app_name.txt, publish
-previews only, from a copy outside this folder (wrangler.toml here belongs
-to the cast site):
-    copy deck_site somewhere else, then inside the copy
+PUBLISHING. `wrangler pages deploy` replaces the WHOLE site: whatever is not
+in deck_site/ is gone, the page buyers use included. The live site was 18
+files on 2026-11-17 (the five pages and the 13 in vendor/) and this build
+writes the same 18 at the same addresses. Publish from a copy outside this
+folder (wrangler.toml here belongs to the cast site). A preview first:
     npx wrangler@4.120.1 pages deploy . --project-name dramadeck --branch preview
+and the live site, on Chris's word only:
+    npx wrangler@4.120.1 pages deploy . --project-name dramadeck --branch main
 """
 import json
 import os
 import re
+import shutil
 
 from build_character_pages import READ_TEMPLATE, TEMPLATE, chime_b64
 
@@ -203,16 +206,25 @@ def main():
         return out
 
     name_file = os.path.join(HERE, "private", "deck_app_name.txt")
-    paid = "app.html"
+    paid = "app/index.html"
     if os.path.exists(name_file):
         paid = open(name_file, encoding="utf-8").read().strip() or paid
-    assert re.fullmatch(r"[A-Za-z0-9_-]+\.html", paid), paid
-    assert paid not in ("index.html", "demo.html", "privacy.html", "terms.html")
+    # A folder of its own: the page finds its libraries in vendor/ beside it
+    # (shell.html: new URL("vendor/", location.href)).
+    assert re.fullmatch(r"[A-Za-z0-9_-]+/index\.html", paid), paid
 
-    os.makedirs(OUT, exist_ok=True)
-    for old in os.listdir(OUT):
-        if old.endswith(".html"):
-            os.remove(os.path.join(OUT, old))
+    if os.path.isdir(OUT):
+        shutil.rmtree(OUT)
+    os.makedirs(os.path.join(OUT, os.path.dirname(paid)))
+    # The import's libraries (pdf.js, Tesseract and its English data), kept
+    # in the site itself so nothing is fetched from anyone else: 13 files,
+    # recovered from the live site with the rest.
+    vendor = os.path.join(DECK, "vendor")
+    n = sum(len(fs) for _, _, fs in os.walk(vendor))
+    assert n == 13, "private/deck/vendor should hold 13 files, found %d" % n
+    shutil.copytree(vendor, os.path.join(OUT, os.path.dirname(paid), "vendor"))
+    print("deck_site/<the paid page's folder>/vendor: %d files, %d MB" % (n, sum(
+        os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(vendor) for f in fs) // 2**20))
     pages = {
         "index.html": read("landing.html"),
         "privacy.html": read("privacy.html"),
@@ -223,7 +235,7 @@ def main():
     for name, html in pages.items():
         with open(os.path.join(OUT, name), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(html)
-        shown = "<the paid page>" if name == paid and name != "app.html" else name
+        shown = "<the paid page>" if name == paid else name
         print("deck_site/%-16s %4d KB" % (shown, len(html.encode("utf-8")) // 1024))
     print("practice page lifted from the cast site: %d KB (%d KB with our notes)"
           % (len(practice) // 1024, len(TEMPLATE) // 1024))
