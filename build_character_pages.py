@@ -1349,11 +1349,11 @@ function playGap(l,k,t,auto){
 //    parts included, pauses left out. "On your lines" is the part of it
 //    spent on the actor's own lines: the wait and the delivery (his ask,
 //    2026-11-17).
-//  - skipped: Got it, "next line", or the arrow on. Got it is the actor
-//    vouching for the line, and so is "next line" (Got it said aloud): the
-//    line counts as fully right (his answer, 2026-11-17) and is not listed
-//    to work on, though it is still counted as skipped. A line left by the
-//    arrow counts as far as it was heard.
+//  - skipped: Got it, "next line", or the arrow on. A skipped line counts
+//    as far as it was heard: the words green when it was left. (For a few
+//    hours on 2026-11-17 Got it scored the line in full; with personal
+//    bests that let a run of Got its set a record, so he took it back:
+//    "just take their most recent % green words".)
 //  - next words asked: the button and the phrase said aloud.
 // A line run more than once counts as its last go; one stepped back off
 // (arrow back) is not counted until it comes round again.
@@ -1428,7 +1428,7 @@ function runNote(l,how,s){
  let marks=[];try{marks=grade(l.say,heard).marks;}catch(_){/**/}
  const old=RUN.rows.get(k);
  RUN.rows.set(k,{k,how,marks,n:marks.length,
-  hit:how==="g"||how==="n"?marks.length:marks.filter(m=>m.ok||freeWord(m.w)).length,
+  hit:marks.filter(m=>m.ok||freeWord(m.w)).length,
   ask:(old?old.ask:0)+s.wb+s.nw,help:(old?old.help:0)+s.lb+s.rm});
 }
 function runTime(ms){const t=Math.max(0,Math.round(ms/1000));
