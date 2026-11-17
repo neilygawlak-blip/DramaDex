@@ -609,6 +609,17 @@ TEMPLATE = """<!DOCTYPE html>
       padding:.4rem .35rem;text-align:center;line-height:1.25}
  .rstat b{display:block;font-size:1.2rem;color:#ffd75e;font-weight:700}
  .rstat span{font-size:.76rem;color:#9aa4c0}
+ .rstat em{display:block;font-style:normal;font-size:.66rem;color:#7d87a3}
+ .rrib{display:block;font-style:normal;font-size:.6rem;letter-spacing:.09em;text-transform:uppercase;
+      font-weight:700;color:#ffd75e;margin-bottom:.05rem}
+ .rstat.rtie{border-color:#b89b3e}
+ .rstat.rnew{border-color:#7fe0a7;box-shadow:0 0 10px rgba(127,224,167,.45),inset 0 0 10px rgba(127,224,167,.12);
+      animation:rglow 1.5s ease-out 1}
+ .rstat.rnew b,.rstat.rnew .rrib{color:#7fe0a7}
+ @keyframes rglow{0%{transform:scale(.94);box-shadow:0 0 0 rgba(127,224,167,0)}
+      35%{transform:scale(1.05);box-shadow:0 0 24px rgba(127,224,167,.95),inset 0 0 14px rgba(127,224,167,.3)}
+      100%{transform:scale(1);box-shadow:0 0 10px rgba(127,224,167,.45),inset 0 0 10px rgba(127,224,167,.12)}}
+ @media (prefers-reduced-motion:reduce){.rstat.rnew{animation:none}}
  .rnote{font-size:.82rem;color:#9aa4c0;margin:.15rem 0 .5rem;line-height:1.45}
  .rhd{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:#9aa4c0;
       margin:1rem 0 .2rem;font-weight:700}
@@ -1346,6 +1357,60 @@ function playGap(l,k,t,auto){
 //  - next words asked: the button and the phrase said aloud.
 // A line run more than once counts as its last go; one stepped back off
 // (arrow back) is not counted until it comes round again.
+// ---- personal bests (Chris, 2026-11-17) ----
+// The best full run of each set, per person. The site keeps them against
+// the sign-in (/api/bests in _worker.js: a scramble of the email, never the
+// email), so they follow the actor across devices with nothing to do; a
+// copy sits in this browser so the report can mark a record the instant a
+// run ends, and still can when the site cannot be reached. The two are
+// merged, the better of each kept.
+//   pct: best % of words right. mine: fewest seconds on their own lines AT
+//   that score. clean: most lines clean.
+// A set is the scene menu's pick, the way of practising and the number of
+// lines in it, so a set that is ever cut differently starts fresh.
+// A fresh start after three months (Chris, 2026-11-17): bests whose last
+// full run on this page is more than 90 days old are dropped, here and on
+// the site, so a repeat of the play starts a new tracking point.
+const PAGEKEY=(location.pathname.split("/").pop()||"").split(".")[0]||NAME;
+const BKEY="bests:"+PAGEKEY,BFRESH=90*86400000;
+let BESTS={},bSeen=0;
+try{bSeen=+localStorage.getItem(BKEY+":seen")||0;
+ BESTS=bSeen&&Date.now()-bSeen>BFRESH?{}:JSON.parse(localStorage.getItem(BKEY)||"{}")||{};}catch(_){BESTS={};}
+function bestKeep(seen){if(seen>bSeen)bSeen=seen;
+ try{localStorage.setItem(BKEY,JSON.stringify(BESTS));
+  if(bSeen)localStorage.setItem(BKEY+":seen",String(bSeen));}catch(_){/**/}}
+function bestTake(j){
+ const sets=j&&j.sets;
+ if(!sets)return;
+ for(const k in sets){const a=BESTS[k],b=sets[k];
+  if(!b||typeof b.pct!=="number")continue;
+  if(!a){BESTS[k]=b;continue;}
+  const top=b.pct>a.pct||(b.pct===a.pct&&b.mine<a.mine)?b:a;
+  BESTS[k]={pct:top.pct,mine:top.mine,clean:Math.max(a.clean||0,b.clean||0),of:top.of,
+   runs:Math.max(a.runs||0,b.runs||0),at:top.at};}
+ bestKeep(+j.seen||0);
+}
+if(TRACK)fetch("/api/bests?page="+PAGEKEY).then(r=>r.ok?r.json():null)
+ .then(j=>{if(j)bestTake(j);}).catch(()=>{});
+// One finished run against the best so far. Answers what to mark on the
+// score, the time and the clean lines: "new", "tie" (matched: still worth
+// a good word, his call), "first", or "" with the best to show beside it.
+function bestRun(set,now){
+ const old=BESTS[set],m={p:"",t:"",c:"",old};
+ if(!old){m.p="first";BESTS[set]=now;}
+ else{
+  if(now.pct>old.pct)m.p="new";else if(now.pct===old.pct)m.p="tie";
+  if(now.pct===old.pct){if(now.mine<old.mine)m.t="new";else if(now.mine===old.mine)m.t="tie";}
+  if(now.clean>(old.clean||0))m.c="new";
+  const top=now.pct>old.pct||(now.pct===old.pct&&now.mine<old.mine)?now:old;
+  BESTS[set]={pct:top.pct,mine:top.mine,clean:Math.max(old.clean||0,now.clean),of:now.of,
+   runs:(old.runs||0)+1,at:top.at};}
+ bestKeep(Date.now());
+ if(TRACK)fetch("/api/bests?page="+PAGEKEY,{method:"POST",keepalive:true,
+  body:JSON.stringify({set,pct:now.pct,mine:now.mine,clean:now.clean,of:now.of})})
+  .then(r=>r.ok?r.json():null).then(j=>{if(j)bestTake(j);}).catch(()=>{});
+ return m;
+}
 let RUN=null;
 const freeWord=w=>w.replace(/[^a-z0-9]/g,"").length<=2;
 const SKIPS="gna";
@@ -1394,7 +1459,9 @@ function nextScope(){
 function showReport(what){
  runWake();runEar();
  const R=RUN,rows=R?[...R.rows.values()]:[];
- const stat=(big,small)=>'<div class="rstat"><b>'+big+'</b><span>'+small+'</span></div>';
+ const stat=(big,small,how,rib,sub)=>'<div class="rstat'+(how==="new"?" rnew":how==="tie"?" rtie":"")+'">'
+  +(rib?'<i class="rrib">'+rib+'</i>':"")+'<b>'+big+'</b><span>'+small+'</span>'
+  +(sub?'<em>'+sub+'</em>':"")+'</div>';
  let h='<div id="verdict">\\u{1F389}</div><div class="mine">'+what+'</div>';
  let bad=[];
  if(R){
@@ -1405,15 +1472,31 @@ function showReport(what){
    const pct=tot?Math.round(100*hit/tot):0;
    const skipped=rows.filter(r=>SKIPS.includes(r.how)).length;
    const clean=rows.filter(r=>r.hit===r.n&&!SKIPS.includes(r.how)&&!r.ask&&!r.help).length;
-   h+='<div class="rstats">'+stat(pct+"%","of your words right")+stat(time,"total time")
-    +stat(runTime(R.mine),"on your lines")
-    +stat(clean+" of "+rows.length,"lines clean")+stat(skipped,skipped===1?"line skipped":"lines skipped")
+   // A full run only: one started part way (from a link below) is no
+   // record and no "last time".
+   const full=!R.part&&rows.length===queue.length&&!TEST;
+   const secs=Math.round(R.mine/1000);
+   const B=full?bestRun(scope.value+"|"+mode.value+"|"+queue.length,
+    {pct,mine:secs,clean,of:rows.length,runs:1,at:new Date().toISOString().slice(0,10)}):{p:"",t:"",c:""};
+   const o=B.old;
+   h+='<div class="rstats">'
+    +stat(pct+"%","of your words right",B.p,
+      B.p==="new"?"\\u2605 New best":B.p==="tie"?"Matches your best":B.p==="first"?"First score here":"",
+      B.p==="new"?"was "+o.pct+"%":o&&B.p===""?"best "+o.pct+"%":"")
+    +stat(time,"total time")
+    +stat(runTime(R.mine),"on your lines",B.t,
+      B.t==="new"?"\\u2605 Best time":B.t==="tie"?"Matches your best":"",
+      // Under the best score a faster time is no record: say what the
+      // best time was scored at, so a quicker, lower run reads right.
+      B.t==="new"?"was "+runTime(o.mine*1000):o&&B.t===""&&B.p!=="new"
+       ?"best "+runTime(o.mine*1000)+(B.p===""?" at "+o.pct+"%":""):"")
+    +stat(clean+" of "+rows.length,"lines clean",B.c,B.c==="new"?"\\u2605 Most yet":"",
+      B.c==="new"?"was "+(o.clean||0):o&&(o.clean||0)>clean?"best "+o.clean:"")
+    +stat(skipped,skipped===1?"line skipped":"lines skipped")
     +stat(R.nw,R.nw===1?"next word asked":"next words asked")
     +(R.help?stat(R.help,"whole line shown or read"):"")+'</div>';
    // The last score for this same set and way of practising, this browser
-   // only. A run started part way (from a link below) is not a full run:
-   // it neither shows nor replaces the score.
-   const full=!R.part&&rows.length===queue.length&&!TEST;
+   // only.
    if(full){const key="rep:"+NAME+":"+scope.value+":"+mode.value;
     try{const was=localStorage.getItem(key);
      if(was!==null&&was!=="")h+='<div class="rnote">Last time on this set: '+(+was)+'%'

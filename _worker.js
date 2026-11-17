@@ -168,6 +168,83 @@ async function session(req, env, url) {
   return json({ ok: true });
 }
 
+// ---- personal bests (Chris, 2026-11-17) ----
+// Each actor's best run of each set, kept against who they signed in as,
+// so a record follows them from phone to laptop with nothing to set up:
+// Access already stamps the signed-in email on every request. The key is
+// a one-way scramble of that email (SHA-256); the email itself is never
+// stored, and nothing here lists who anyone is. One key a person and
+// page, best/<scramble>/<page>, holding a small JSON:
+//   { "<set>|<mode>|<lines in the set>": {pct, mine, clean, of, runs, at} }
+// pct: best % of words right. mine: fewest seconds on their own lines AT
+// that score (a faster run with a lower score is no record). clean: most
+// lines clean. runs: full runs of the set. at: the day the best was set.
+// GET reads them; POST adds one run and answers with the merged bests.
+//
+// A fresh start after three months (Chris, 2026-11-17): if the last full
+// run on a page was more than 90 days ago, its bests are dropped and the
+// next run starts a new tracking point. A play is over once it has been
+// performed; whoever meets the same part again, in a repeat or at another
+// theatre, should not be measured against an old production. `seen` is
+// the time of the last run, and the store also lets the key go by itself
+// after the same 90 days.
+const FRESH_DAYS = 90;
+async function whoKey(req) {
+  const email = (req.headers.get("cf-access-authenticated-user-email") || "")
+    .toLowerCase().trim();
+  if (!email) return "";
+  const d = await crypto.subtle.digest(
+    "SHA-256", new TextEncoder().encode("dramadex-bests:" + email));
+  return [...new Uint8Array(d)]
+    .map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 40);
+}
+
+const whole = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
+
+async function bests(req, env, url) {
+  const page = (url.searchParams.get("page") || "")
+    .replace(/[^0-9A-Za-z_]/g, "").slice(0, 40);
+  if (!page) return json({ error: "bad page" }, 400);
+  const who = await whoKey(req);
+  // No sign-in on the request (a local copy of the site): nothing kept.
+  if (!who) return json({ off: true, sets: {} });
+  const key = "best/" + who + "/" + page;
+  let sets = {}, seen = 0;
+  try {
+    const kept = JSON.parse((await env.VOICES.get(key)) || "{}") || {};
+    if (kept.seen && Date.now() - kept.seen <= FRESH_DAYS * 86400000) {
+      sets = kept.sets || {};
+      seen = kept.seen;
+    }
+  } catch (_) { sets = {}; }
+  if (req.method !== "POST") return json({ sets, seen });
+  let run;
+  try { run = JSON.parse(await req.text()); }
+  catch (_) { return json({ error: "bad run" }, 400); }
+  const set = String((run && run.set) || "");
+  if (!/^[\w :.,'()-]{1,60}\|[a-z]{1,12}\|\d{1,4}$/.test(set) ||
+      !whole(run.pct, 0, 100) || !whole(run.mine, 0, 86400) ||
+      !whole(run.of, 1, 5000) || !whole(run.clean, 0, run.of))
+    return json({ error: "bad run" }, 400);
+  if (!sets[set] && Object.keys(sets).length >= 300)
+    return json({ error: "full" }, 400);
+  const now = { pct: run.pct, mine: run.mine, clean: run.clean, of: run.of,
+                runs: 1, at: new Date().toISOString().slice(0, 10) };
+  const old = sets[set];
+  if (!old) sets[set] = now;
+  else {
+    const top = now.pct > old.pct ||
+      (now.pct === old.pct && now.mine < old.mine) ? now : old;
+    sets[set] = { pct: top.pct, mine: top.mine,
+                  clean: Math.max(old.clean || 0, now.clean), of: now.of,
+                  runs: (old.runs || 0) + 1, at: top.at };
+  }
+  seen = Date.now();
+  await env.VOICES.put(key, JSON.stringify({ seen, sets }),
+    { expirationTtl: FRESH_DAYS * 86400 });
+  return json({ sets, seen });
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
@@ -175,6 +252,7 @@ export default {
       return miclog(req, env, url);
     if (url.pathname === "/api/session" && req.method === "POST")
       return session(req, env, url);
+    if (url.pathname === "/api/bests") return bests(req, env, url);
     if (url.pathname === "/api/voice-upload" && req.method === "POST")
       return upload(req, env, url);
     if (url.pathname === "/api/voice-presence") return presence();
