@@ -1222,9 +1222,10 @@ const SESS={v:1,id:new Date().toISOString().slice(0,19).replace(/[:T]/g,"-")
  ears:"",hold:0,mode:"",scope:"",runs:0,lines:[],err:{},restarts:0,ttsLost:0};
 let sLine=null,sSent=0,sAt=0;
 function noteErr(k){SESS.err[k]=(SESS.err[k]||0)+1;}
-function noteLine(l){sLine={i:l.i,w:norm(l.say).split(" ").filter(w=>w).length,
+function noteLine(l){if(RUN)RUN.lAt=0;sLine={i:l.i,w:norm(l.say).split(" ").filter(w=>w).length,
  t:performance.now(),tj:0,wb:0,nw:0,lb:0,rm:0,rt:0};}
-function noteListen(){if(sLine&&!sLine.tj)sLine.tj=performance.now();}
+function noteListen(){if(sLine&&!sLine.tj)sLine.tj=performance.now();
+ if(RUN&&!RUN.lAt)RUN.lAt=performance.now();}
 function noteHint(k){if(sLine)sLine[k]++;}
 function noteDone(l,how){
  if(!sLine||!l||sLine.i!==l.i)return;
@@ -1333,6 +1334,10 @@ function playGap(l,k,t,auto){
 //    not when the line was left. A word of one or two letters is never
 //    counted against anyone ("100% for all 2 letter words": the ears drop
 //    those often).
+//  - total time: Start to the end of the set, the page reading the other
+//    parts included, pauses left out. "On your lines" is the part of it
+//    spent on the actor's own lines: the wait and the delivery (his ask,
+//    2026-11-17).
 //  - skipped: Got it, "next line", or the arrow on. Got it is the actor
 //    vouching for the line, and so is "next line" (Got it said aloud): the
 //    line counts as fully right (his answer, 2026-11-17) and is not listed
@@ -1345,8 +1350,12 @@ let RUN=null;
 const freeWord=w=>w.replace(/[^a-z0-9]/g,"").length<=2;
 const SKIPS="gna";
 function runWake(){if(RUN&&RUN.pAt){RUN.idle+=performance.now()-RUN.pAt;RUN.pAt=0;}}
+// Time on the actor's own lines: from the moment the page starts waiting
+// for a line to the moment it is left, every go at it, pauses left out.
+function runEar(){if(RUN&&RUN.lAt){RUN.mine+=performance.now()-RUN.lAt;RUN.lAt=0;}}
 function runNote(l,how,s){
  if(!RUN)return;
+ runEar();
  const k=queue[pos];
  if(DATA.lines[k]!==l)return;
  RUN.nw+=s.wb+s.nw;RUN.help+=s.lb+s.rm;
@@ -1383,7 +1392,7 @@ function nextScope(){
  return null;
 }
 function showReport(what){
- runWake();
+ runWake();runEar();
  const R=RUN,rows=R?[...R.rows.values()]:[];
  const stat=(big,small)=>'<div class="rstat"><b>'+big+'</b><span>'+small+'</span></div>';
  let h='<div id="verdict">\\u{1F389}</div><div class="mine">'+what+'</div>';
@@ -1396,7 +1405,8 @@ function showReport(what){
    const pct=tot?Math.round(100*hit/tot):0;
    const skipped=rows.filter(r=>SKIPS.includes(r.how)).length;
    const clean=rows.filter(r=>r.hit===r.n&&!SKIPS.includes(r.how)&&!r.ask&&!r.help).length;
-   h+='<div class="rstats">'+stat(pct+"%","of your words right")+stat(time,"time")
+   h+='<div class="rstats">'+stat(pct+"%","of your words right")+stat(time,"total time")
+    +stat(runTime(R.mine),"on your lines")
     +stat(clean+" of "+rows.length,"lines clean")+stat(skipped,skipped===1?"line skipped":"lines skipped")
     +stat(R.nw,R.nw===1?"next word asked":"next words asked")
     +(R.help?stat(R.help,"whole line shown or read"):"")+'</div>';
@@ -1426,7 +1436,7 @@ function showReport(what){
      +'<button id="rmorebtn">Show all '+bad.length+' \\u25BE</button>';
    }
   }else{
-   h+='<div class="rstats">'+stat(time,"time")+'</div>';
+   h+='<div class="rstats">'+stat(time,"total time")+(rows.length?stat(runTime(R.mine),"on your lines"):"")+'</div>';
    if(rows.length)h+='<div class="rnote">The mic heard nothing this run, so there is no score to show.</div>';
   }
   h+='</div>';
@@ -1670,7 +1680,7 @@ function start(q,at){
    [queue[i],queue[j]]=[queue[j],queue[i]];}}
  // `at`: start at one line of the set (the report's "practice from here").
  pos=at===undefined?0:Math.max(0,queue.indexOf(at));running=true;paused=false;
- RUN={t0:performance.now(),idle:0,pAt:0,rows:new Map(),mic:false,nw:0,help:0,part:pos>0};
+ RUN={t0:performance.now(),idle:0,pAt:0,rows:new Map(),mic:false,nw:0,help:0,mine:0,lAt:0,part:pos>0};
  pausebtn.textContent="\\u23F8";pausebtn.title="pause";
  startbtn.style.display="none";pausebtn.style.display="";
  prevbtn.style.display="";nextbtn.style.display="";
@@ -1729,6 +1739,7 @@ mode.onchange=()=>{if(running)halt();};
 // its done-callback, which flips judging back on — the page kept
 // listening and reacting while "paused".
 function pause(){if(paused)return;paused=true;token++;judging=false;
+ runEar();
  if(RUN&&!RUN.pAt)RUN.pAt=performance.now();
  sendSess(true);
  pausebtn.textContent="\\u25B6";pausebtn.title="resume";
