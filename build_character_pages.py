@@ -1365,7 +1365,7 @@ function playGap(l,k,t,auto){
 // run ends, and still can when the site cannot be reached. The two are
 // merged, the better of each kept.
 //   pct: best % of words right. mine: fewest seconds on their own lines AT
-//   that score. clean: most lines clean.
+//   that score. (clean: a lines-clean count, taken out for now; sent as 0.)
 // A set is the scene menu's pick, the way of practising and the number of
 // lines in it, so a set that is ever cut differently starts fresh.
 // A fresh start after three months (Chris, 2026-11-17): bests whose last
@@ -1393,7 +1393,7 @@ function bestTake(j){
 if(TRACK)fetch("/api/bests?page="+PAGEKEY).then(r=>r.ok?r.json():null)
  .then(j=>{if(j)bestTake(j);}).catch(()=>{});
 // One finished run against the best so far. Answers what to mark on the
-// score, the time and the clean lines: "new", "tie" (matched: still worth
+// score and the time: "new", "tie" (matched: still worth
 // a good word, his call), "first", or "" with the best to show beside it.
 function bestRun(set,now){
  const old=BESTS[set],m={p:"",t:"",c:"",old};
@@ -1471,7 +1471,12 @@ function showReport(what){
    const tot=rows.reduce((a,r)=>a+r.n,0),hit=rows.reduce((a,r)=>a+r.hit,0);
    const pct=tot?Math.round(100*hit/tot):0;
    const skipped=rows.filter(r=>SKIPS.includes(r.how)).length;
-   const clean=rows.filter(r=>r.hit===r.n&&!SKIPS.includes(r.how)&&!r.ask&&!r.help).length;
+   // No "lines clean" count (Chris, 2026-11-17: taken out "for now"; every
+   // word with no hint and no skip "isnt tracking correctly", and 75% or
+   // better "wouldve still not counted several of my comfortable lines").
+   // The bests still carry the field, always 0, so nothing stale builds up
+   // and the store's shape need not change if a count comes back.
+   const clean=0;
    // A full run only: one started part way (from a link below) is no
    // record and no "last time".
    const full=!R.part&&rows.length===queue.length&&!TEST;
@@ -1490,8 +1495,6 @@ function showReport(what){
       // best time was scored at, so a quicker, lower run reads right.
       B.t==="new"?"was "+runTime(o.mine*1000):o&&B.t===""&&B.p!=="new"
        ?"best "+runTime(o.mine*1000)+(B.p===""?" at "+o.pct+"%":""):"")
-    +stat(clean+" of "+rows.length,"lines clean",B.c,B.c==="new"?"\\u2605 Most yet":"",
-      B.c==="new"?"was "+(o.clean||0):o&&(o.clean||0)>clean?"best "+o.clean:"")
     +stat(skipped,skipped===1?"line skipped":"lines skipped")
     +stat(R.nw,R.nw===1?"next word asked":"next words asked")
     +(R.help?stat(R.help,"whole line shown or read"):"")+'</div>';
