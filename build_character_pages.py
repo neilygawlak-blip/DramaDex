@@ -624,6 +624,8 @@ TEMPLATE = """<!DOCTYPE html>
  .rhd{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:#9aa4c0;
       margin:1rem 0 .2rem;font-weight:700}
  .rline{border-left:3px solid #3a4a75;padding:.25rem 0 .25rem .7rem;margin:.6rem 0}
+ .rline.rok{border-left-color:#2f6b4c}
+ .rline.rok .rhead b{color:#7fe0a7}
  .rhead{font-size:.8rem;color:#9aa4c0;display:flex;flex-wrap:wrap;gap:.2rem .6rem;align-items:baseline}
  .rhead b{color:#ffd75e;font-size:1rem}
  .rtag{border:1px solid #3a4a75;border-radius:999px;padding:0 .45rem;font-size:.72rem}
@@ -1463,7 +1465,10 @@ function showReport(what){
   +(rib?'<i class="rrib">'+rib+'</i>':"")+'<b>'+big+'</b><span>'+small+'</span>'
   +(sub?'<em>'+sub+'</em>':"")+'</div>';
  let h='<div id="verdict">\\u{1F389}</div><div class="mine">'+what+'</div>';
- let bad=[];
+ const nx=nextScope();
+ const btns='<div style="margin:.9rem 0 .5rem"><button class="primary" id="runbackbtn">\\u21BA Run It Back</button>'
+  +(nx?' <button id="rnextbtn">Next set of Lines \\u2192</button>':"")+'</div>';
+ let all=[],placed=false;
  if(R){
   const time=runTime(performance.now()-R.t0-R.idle);
   h+='<div id="report">';
@@ -1505,38 +1510,46 @@ function showReport(what){
      if(was!==null&&was!=="")h+='<div class="rnote">Last time on this set: '+(+was)+'%'
       +(pct>+was?", up "+(pct-was)+".":pct<+was?", down "+(was-pct)+".":", the same.")+'</div>';
      localStorage.setItem(key,String(pct));}catch(_){/**/}}
-   bad=rows.filter(r=>r.n&&r.hit<r.n).sort((a,b)=>a.hit/a.n-b.hit/b.n||a.k-b.k);
-   if(!bad.length)h+='<div class="rhd">Lines to work on</div><div class="rnote">None. Every word of every line was heard.</div>';
-   else{
-    const one=r=>{const l=DATA.lines[r.k];
-     return '<div class="rline"><div class="rhead"><b>'+Math.round(100*r.hit/r.n)+'%</b>'
-      +(l.page?'<span>p. '+l.page+'</span>':"")
-      +(SKIPS.includes(r.how)?'<span class="rtag">skipped</span>':"")
-      +(r.ask?'<span class="rtag">'+r.ask+(r.ask===1?" word asked":" words asked")+'</span>':"")
-      +'<a class="rgo" data-k="'+r.k+'">practice from here \\u2192</a></div>'
-      +'<div class="rtext">'+runLine(r)+'</div></div>';};
-    h+='<div class="rhd">Lines to work on</div>'
-     +'<div class="rnote">Underlined words were not heard. Words of one or two letters are never counted against you.</div>'
-     +bad.slice(0,3).map(one).join("");
-    if(bad.length>3)h+='<div id="rmore" style="display:none">'+bad.slice(3).map(one).join("")+'</div>'
-     +'<button id="rmorebtn">Show all '+bad.length+' \\u25BE</button>';
-   }
+   // The lines (Chris, 2026-11-17): the two roughest first, then EVERY
+   // line of the run in the order it is spoken, right or not, so reading
+   // the report is one more pass through the part in sequence ("one more
+   // instance of seeing all of their presented lines in the order theyre
+   // presented"). It was the least accurate first, three shown. The
+   // buttons sit above the lists now, so a long set does not bury them.
+   // Twenty lines show at once; a longer set opens with Show all.
+   h+=btns;placed=true;
+   const bad=rows.filter(r=>r.n&&r.hit<r.n).sort((a,b)=>a.hit/a.n-b.hit/b.n||a.k-b.k);
+   all=rows.filter(r=>r.n).sort((a,b)=>a.k-b.k);
+   const one=r=>{const l=DATA.lines[r.k];
+    return '<div class="rline'+(r.hit===r.n?" rok":"")+'"><div class="rhead"><b>'+Math.round(100*r.hit/r.n)+'%</b>'
+     +(l.page?'<span>p. '+l.page+'</span>':"")
+     +(SKIPS.includes(r.how)?'<span class="rtag">skipped</span>':"")
+     +(r.ask?'<span class="rtag">'+r.ask+(r.ask===1?" word asked":" words asked")+'</span>':"")
+     +'<a class="rgo" data-k="'+r.k+'">practice from here \\u2192</a></div>'
+     +'<div class="rtext">'+runLine(r)+'</div></div>';};
+   h+='<div class="rhd">Roughest lines</div>'
+    +(bad.length?bad.slice(0,2).map(one).join("")
+      :'<div class="rnote">None. Every word of every line was heard.</div>')
+    +'<div class="rhd">Your lines, in order</div>'
+    +'<div class="rnote">Underlined words were not heard. Words of one or two letters are never counted against you.</div>'
+    +all.slice(0,20).map(one).join("");
+   if(all.length>20)h+='<div id="rmore" style="display:none">'+all.slice(20).map(one).join("")+'</div>'
+    +'<button id="rmorebtn">Show all '+all.length+' \\u25BE</button>';
   }else{
    h+='<div class="rstats">'+stat(time,"total time")+(rows.length?stat(runTime(R.mine),"on your lines"):"")+'</div>';
    if(rows.length)h+='<div class="rnote">The mic heard nothing this run, so there is no score to show.</div>';
   }
   h+='</div>';
  }
- const nx=nextScope();
- // Room under the buttons: the two pills fixed to the bottom of the screen
- // would otherwise sit on them at the end of a long report.
- h+='<div style="margin:.9rem 0 6rem"><button class="primary" id="runbackbtn">\\u21BA Run It Back</button>'
-  +(nx?' <button id="rnextbtn">Next set of Lines \\u2192</button>':"")+'</div>';
+ // Room at the bottom: the two pills fixed to the bottom of the screen
+ // would otherwise sit on the last thing in a long report.
+ if(!placed)h+=btns;
+ h+='<div style="height:6rem"></div>';
  stage.innerHTML=h;
  const mb=document.getElementById("rmorebtn");
  if(mb)mb.onclick=()=>{const x=document.getElementById("rmore"),open=x.style.display==="none";
   x.style.display=open?"":"none";
-  mb.textContent=open?"Show fewer \\u25B4":"Show all "+bad.length+" \\u25BE";};
+  mb.textContent=open?"Show fewer \\u25B4":"Show all "+all.length+" \\u25BE";};
  // Straight to one line: the same set, started at that line.
  stage.querySelectorAll(".rgo").forEach(a=>{a.onclick=()=>start(currentSet(),+a.dataset.k);});
  // The next pick is only chosen; they press Start themselves.
