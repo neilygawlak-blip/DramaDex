@@ -305,6 +305,17 @@ try {
       await tab.ev(`document.getElementById("gotbtn")&&document.getElementById("gotbtn").click()`);
     }
   }
+  // RIG_DEBUG=1: the run report the page drew when the set ended, then its
+  // ways on: Show all, "Next set of Lines", and "practice from here" on the
+  // first listed line. Shown on this machine only; it is play text.
+  if (process.env.RIG_DEBUG) {
+    await tab.until(`!running&&!!document.getElementById("report")`, 8000);
+    console.log("---- run report ----\n" + await tab.ev(`document.getElementById("report")?stage.innerText:"(no report drawn)"`));
+    console.log("underlined: " + await tab.ev(`JSON.stringify([...stage.querySelectorAll(".rmiss")].map(x=>x.textContent))`));
+    console.log("show all: " + await tab.ev(`(()=>{const b=document.getElementById("rmorebtn");if(!b)return "no button (three or fewer lines listed)";b.click();return document.getElementById("rmore").style.display===""?"opened, "+stage.querySelectorAll(".rline").length+" lines listed, button now reads "+b.textContent:"DID NOT OPEN";})()`));
+    console.log("next set: " + await tab.ev(`(()=>{const b=document.getElementById("rnextbtn");if(!b)return "no button";const was=scope.value;b.click();return was+" -> "+scope.value+" ("+scope.options[scope.selectedIndex].textContent+"), running="+running+", says: "+my.textContent;})()`));
+    console.log("practice from here: " + await tab.ev(`(()=>{scope.value="run:0";showReport("again");const a=stage.querySelector(".rgo");if(!a)return "no link (nothing listed)";const k=+a.dataset.k;a.click();const r="asked for line "+k+", run started at line "+queue[pos]+" (place "+(pos+1)+" of "+queue.length+"), running="+running;halt();return r;})()`));
+  }
   const ears = await tab.ev(`JSON.stringify(__rig.ears)`).then(JSON.parse);
   const count = e => ears.filter(x => x[1] === e).length;
   const errs = ears.filter(x => x[1].startsWith("error:") && x[1] !== "error:aborted").map(x => x[1]);

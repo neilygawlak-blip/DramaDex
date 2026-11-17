@@ -603,6 +603,23 @@ TEMPLATE = """<!DOCTYPE html>
       background:#131d38;box-shadow:0 2px 8px rgba(0,0,0,.55),
       0 0 6px rgba(255,183,71,.12)}
  #verdict{font-size:2.2rem;margin:.5rem 0}
+ #report{margin:.8rem 0 .3rem;text-align:left}
+ .rstats{display:flex;flex-wrap:wrap;gap:.5rem;margin:.2rem 0 .6rem}
+ .rstat{flex:1 1 5.4rem;border:1px solid #2b3a5e;border-radius:10px;background:#111a30;
+      padding:.4rem .35rem;text-align:center;line-height:1.25}
+ .rstat b{display:block;font-size:1.2rem;color:#ffd75e;font-weight:700}
+ .rstat span{font-size:.76rem;color:#9aa4c0}
+ .rnote{font-size:.82rem;color:#9aa4c0;margin:.15rem 0 .5rem;line-height:1.45}
+ .rhd{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:#9aa4c0;
+      margin:1rem 0 .2rem;font-weight:700}
+ .rline{border-left:3px solid #3a4a75;padding:.25rem 0 .25rem .7rem;margin:.6rem 0}
+ .rhead{font-size:.8rem;color:#9aa4c0;display:flex;flex-wrap:wrap;gap:.2rem .6rem;align-items:baseline}
+ .rhead b{color:#ffd75e;font-size:1rem}
+ .rtag{border:1px solid #3a4a75;border-radius:999px;padding:0 .45rem;font-size:.72rem}
+ .rgo{margin-left:auto;color:#7d87a3;font-size:.78rem;text-decoration:underline;cursor:pointer}
+ .rtext{font-size:1rem;font-weight:400;color:#c7cee2;margin-top:.2rem;line-height:1.5}
+ .rmiss{color:#ffb38a;text-decoration:underline;text-decoration-color:#ff8a5c;text-underline-offset:3px}
+ #rmorebtn{font-size:.85rem;padding:.3rem .7rem;color:#9aa4c0}
  #nailfx{position:fixed;bottom:4.4rem;left:0;right:0;text-align:center;
       pointer-events:none;z-index:8}
  #nailfx svg{width:2.6rem;height:2.6rem;animation:nailfade .9s forwards}
@@ -1212,6 +1229,7 @@ function noteHint(k){if(sLine)sLine[k]++;}
 function noteDone(l,how){
  if(!sLine||!l||sLine.i!==l.i)return;
  const s=sLine,now=performance.now();sLine=null;
+ runNote(l,how,s);
  let r=0,h=0;
  try{r=Math.round(100*grade(l.say,heard).r);
   h=norm(heard).split(" ").filter(w=>w).length;}catch(_){/**/}
@@ -1303,14 +1321,137 @@ function playGap(l,k,t,auto){
  setTimeout(()=>{if(t!==token||!running||paused)return;
   speak(g.t,g.p,g.s,()=>playGap(l,k+1,t,auto),g.l);},wait);
 }
+// ---- the run report (Chris, 2026-11-17) ----
+// When a run ends, beside Run It Back: how it went, and which lines to work
+// on. A "session" is one run of what the scene menu holds (Act I Run 1).
+// Everything here is worked out in the page from the run just finished and
+// goes nowhere; only the last score for each set is kept, in this browser,
+// to show beside the next one.
+//
+// What counts, by his word:
+//  - % of words right: every word of every line the run reached, lit or
+//    not when the line was left. A word of one or two letters is never
+//    counted against anyone ("100% for all 2 letter words": the ears drop
+//    those often). A skipped line counts as far as it was heard.
+//  - skipped: Got it, "next line", or the arrow on.
+//  - next words asked: the button and the phrase said aloud.
+// A line run more than once counts as its last go; one stepped back off
+// (arrow back) is not counted until it comes round again.
+let RUN=null;
+const freeWord=w=>w.replace(/[^a-z0-9]/g,"").length<=2;
+const SKIPS="gna";
+function runWake(){if(RUN&&RUN.pAt){RUN.idle+=performance.now()-RUN.pAt;RUN.pAt=0;}}
+function runNote(l,how,s){
+ if(!RUN)return;
+ const k=queue[pos];
+ if(DATA.lines[k]!==l)return;
+ RUN.nw+=s.wb+s.nw;RUN.help+=s.lb+s.rm;
+ if(how==="b")return;
+ let marks=[];try{marks=grade(l.say,heard).marks;}catch(_){/**/}
+ const old=RUN.rows.get(k);
+ RUN.rows.set(k,{k,how,marks,n:marks.length,
+  hit:marks.filter(m=>m.ok||freeWord(m.w)).length,
+  ask:(old?old.ask:0)+s.wb+s.nw,help:(old?old.help:0)+s.lb+s.rm});
+}
+function runTime(ms){const t=Math.max(0,Math.round(ms/1000));
+ return Math.floor(t/60)+":"+String(t%60).padStart(2,"0");}
+// A line as printed, the words that were not heard underlined. The marks
+// are per spoken word and the print is per token ("head-porter" is two
+// words), so the tokens are walked against the marks; if the two ever
+// disagree the plain words are shown instead.
+function runLine(r){
+ const l=DATA.lines[r.k],miss=m=>!m.ok&&!freeWord(m.w);
+ let j=0,fits=true;
+ const out=l.say.split(" ").filter(x=>x).map(tk=>{
+  const n=norm(tk).split(" ").filter(w=>w).length;let bad=false;
+  for(let q=0;q<n;q++){const m=r.marks[j++];if(!m){fits=false;break;}if(miss(m))bad=true;}
+  return bad?'<span class="rmiss">'+esc(tk)+'</span>':esc(tk);});
+ if(fits&&j===r.marks.length)return out.join(" ");
+ return r.marks.map(m=>miss(m)?'<span class="rmiss">'+esc(m.w)+'</span>':esc(m.w)).join(" ");
+}
+// The next pick of the same kind in the scene menu: a run leads to the
+// next run, an act to the next act, the whole play to nothing.
+function nextScope(){
+ if(TEST)return null;
+ const o=[...scope.options],kind=scope.value.split(":")[0];
+ if(kind==="all")return null;
+ for(let j=scope.selectedIndex+1;j<o.length;j++)if(o[j].value.split(":")[0]===kind)return o[j];
+ return null;
+}
+function showReport(what){
+ runWake();
+ const R=RUN,rows=R?[...R.rows.values()]:[];
+ const stat=(big,small)=>'<div class="rstat"><b>'+big+'</b><span>'+small+'</span></div>';
+ let h='<div id="verdict">\\u{1F389}</div><div class="mine">'+what+'</div>';
+ let bad=[];
+ if(R){
+  const time=runTime(performance.now()-R.t0-R.idle);
+  h+='<div id="report">';
+  if(rows.length&&R.mic){
+   const tot=rows.reduce((a,r)=>a+r.n,0),hit=rows.reduce((a,r)=>a+r.hit,0);
+   const pct=tot?Math.round(100*hit/tot):0;
+   const skipped=rows.filter(r=>SKIPS.includes(r.how)).length;
+   const clean=rows.filter(r=>r.hit===r.n&&!SKIPS.includes(r.how)&&!r.ask&&!r.help).length;
+   h+='<div class="rstats">'+stat(pct+"%","of your words right")+stat(time,"time")
+    +stat(clean+" of "+rows.length,"lines clean")+stat(skipped,skipped===1?"line skipped":"lines skipped")
+    +stat(R.nw,R.nw===1?"next word asked":"next words asked")
+    +(R.help?stat(R.help,"whole line shown or read"):"")+'</div>';
+   // The last score for this same set and way of practising, this browser
+   // only. A run started part way (from a link below) is not a full run:
+   // it neither shows nor replaces the score.
+   const full=!R.part&&rows.length===queue.length&&!TEST;
+   if(full){const key="rep:"+NAME+":"+scope.value+":"+mode.value;
+    try{const was=localStorage.getItem(key);
+     if(was!==null&&was!=="")h+='<div class="rnote">Last time on this set: '+(+was)+'%'
+      +(pct>+was?", up "+(pct-was)+".":pct<+was?", down "+(was-pct)+".":", the same.")+'</div>';
+     localStorage.setItem(key,String(pct));}catch(_){/**/}}
+   bad=rows.filter(r=>r.n&&r.hit<r.n).sort((a,b)=>a.hit/a.n-b.hit/b.n||a.k-b.k);
+   if(!bad.length)h+='<div class="rhd">Lines to work on</div><div class="rnote">None. Every word of every line was heard.</div>';
+   else{
+    const one=r=>{const l=DATA.lines[r.k];
+     return '<div class="rline"><div class="rhead"><b>'+Math.round(100*r.hit/r.n)+'%</b>'
+      +(l.page?'<span>p. '+l.page+'</span>':"")
+      +(SKIPS.includes(r.how)?'<span class="rtag">skipped</span>':"")
+      +(r.ask?'<span class="rtag">'+r.ask+(r.ask===1?" word asked":" words asked")+'</span>':"")
+      +'<a class="rgo" data-k="'+r.k+'">practice from here \\u2192</a></div>'
+      +'<div class="rtext">'+runLine(r)+'</div></div>';};
+    h+='<div class="rhd">Lines to work on</div>'
+     +'<div class="rnote">Underlined words were not heard. Words of one or two letters are never counted against you.</div>'
+     +bad.slice(0,3).map(one).join("");
+    if(bad.length>3)h+='<div id="rmore" style="display:none">'+bad.slice(3).map(one).join("")+'</div>'
+     +'<button id="rmorebtn">Show all '+bad.length+' \\u25BE</button>';
+   }
+  }else{
+   h+='<div class="rstats">'+stat(time,"time")+'</div>';
+   if(rows.length)h+='<div class="rnote">The mic heard nothing this run, so there is no score to show.</div>';
+  }
+  h+='</div>';
+ }
+ const nx=nextScope();
+ // Room under the buttons: the two pills fixed to the bottom of the screen
+ // would otherwise sit on them at the end of a long report.
+ h+='<div style="margin:.9rem 0 6rem"><button class="primary" id="runbackbtn">\\u21BA Run It Back</button>'
+  +(nx?' <button id="rnextbtn">Next set of Lines \\u2192</button>':"")+'</div>';
+ stage.innerHTML=h;
+ const mb=document.getElementById("rmorebtn");
+ if(mb)mb.onclick=()=>{const x=document.getElementById("rmore"),open=x.style.display==="none";
+  x.style.display=open?"":"none";
+  mb.textContent=open?"Show fewer \\u25B4":"Show all "+bad.length+" \\u25BE";};
+ // Straight to one line: the same set, started at that line.
+ stage.querySelectorAll(".rgo").forEach(a=>{a.onclick=()=>start(currentSet(),+a.dataset.k);});
+ // The next pick is only chosen; they press Start themselves.
+ const nb=document.getElementById("rnextbtn");
+ if(nb)nb.onclick=()=>{scope.value=nx.value;stage.innerHTML="";whereEl.textContent="";
+  my.textContent="\\u{1F34D} Press Start to run this selection.";
+  try{window.scrollTo(0,0);}catch(_){/**/}};
+}
 function step(){
  if(!running||paused)return;
  if(pos>=queue.length){
   const v=scope.value;
   const what=v.startsWith("act:")?v.slice(4)+" complete!"
    :v.startsWith("run:")?"Scene complete!":"That's the whole play!";
-  stage.innerHTML='<div id="verdict">\\u{1F389}</div><div class="mine">'+what+'</div>'+
-   '<button class="primary" id="runbackbtn" style="margin-top:.9rem">\\u21BA Run It Back</button>';
+  showReport(what);
   whereEl.textContent="";my.textContent="";stop();
   document.getElementById("runbackbtn").onclick=()=>start(currentSet());
   return;}
@@ -1516,14 +1657,16 @@ function doneEnough(l){
  return true;
 }
 
-function start(q){
+function start(q,at){
  queue=q||currentSet();if(!queue.length){my.textContent="Nothing in that run.";return;}
  // Quiz challenge: same drill, but the cue lines come at you in a
  // random order every run (Fisher-Yates).
  if(mode.value==="quiz"){queue=[...queue];
   for(let i=queue.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));
    [queue[i],queue[j]]=[queue[j],queue[i]];}}
- pos=0;running=true;paused=false;
+ // `at`: start at one line of the set (the report's "practice from here").
+ pos=at===undefined?0:Math.max(0,queue.indexOf(at));running=true;paused=false;
+ RUN={t0:performance.now(),idle:0,pAt:0,rows:new Map(),mic:false,nw:0,help:0,part:pos>0};
  pausebtn.textContent="\\u23F8";pausebtn.title="pause";
  startbtn.style.display="none";pausebtn.style.display="";
  prevbtn.style.display="";nextbtn.style.display="";
@@ -1549,7 +1692,7 @@ function jump(d){if(!running)return;
  hush();freshEars();
  // Stepping forward off the last line is how a run ends, not a wall.
  pos=Math.max(0,Math.min(queue.length,pos+d));
- if(paused){paused=false;if(rec)try{rec.start();}catch(_){/**/}}
+ if(paused){paused=false;runWake();if(rec)try{rec.start();}catch(_){/**/}}
  pausebtn.textContent="\\u23F8";pausebtn.title="pause";my.textContent="";
  // A breath between cancel and the next speak, or Chrome eats the speak.
  token++;setTimeout(step,150);}
@@ -1582,6 +1725,7 @@ mode.onchange=()=>{if(running)halt();};
 // its done-callback, which flips judging back on — the page kept
 // listening and reacting while "paused".
 function pause(){if(paused)return;paused=true;token++;judging=false;
+ if(RUN&&!RUN.pAt)RUN.pAt=performance.now();
  sendSess(true);
  pausebtn.textContent="\\u25B6";pausebtn.title="resume";
  hush();
@@ -1589,6 +1733,7 @@ function pause(){if(paused)return;paused=true;token++;judging=false;
  dropMic();
  my.textContent="Paused.";}
 function resume(){if(!paused)return;paused=false;autoPaused=false;
+ runWake();
  pausebtn.textContent="\\u23F8";pausebtn.title="pause";
  my.textContent="";
  if(HOLDASK&&mode.value!=="mine")holdMic();
@@ -1696,6 +1841,7 @@ function wordAloud(l){
 // knock on it with no mic at all).
 function heardNow(text){
  if(!judging)return;
+ if(RUN)RUN.mic=true;
  clearTimeout(greenT);
  heard=kept?kept+" "+text:text;
  const l=DATA.lines[queue[pos]];
