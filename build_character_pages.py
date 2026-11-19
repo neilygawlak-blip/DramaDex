@@ -315,11 +315,15 @@ CD_SFX = [
 # it plays with no second request and from a file:// handout too. The other
 # three in sounds/ are the alternates: change the name here and rebuild.
 CHIME = "chime_lift.mp3"
+# The beat between lines in My Lines Only (Chris, 2026-11-19: a short sound
+# in place of the speaker's name said aloud). The marimba tap: soft, warm,
+# and nothing like the chime, so the two are never mistaken for each other.
+BEAT = "chime_wood.mp3"
 
 
-def chime_b64():
+def chime_b64(name=None):
     import base64
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", CHIME)
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", name or CHIME)
     with open(path, "rb") as fh:
         return base64.b64encode(fh.read()).decode()
 
@@ -421,7 +425,8 @@ PLAYS = {
         "acts": 2,
         # Shown small beside the play's name on its button and its page
         # titles (Chris, 2026-11-16): the production moved every year
-        # twelve on, private/communicating_doors/production_changes.tsv.
+        # thirty-two on (2026 is the book's 1994),
+        # private/communicating_doors/production_changes.tsv.
         "note": "Present Year 2026",
         # Printed pages: Act One opens on p.7 and ends on p.62, Act Two
         # runs p.63 to the END OF PLAY on p.112.
@@ -587,6 +592,7 @@ TEMPLATE = """<!DOCTYPE html>
       padding:0 1rem;background:#0a0f1e;color:#e8e6df;line-height:1.55}
  h1{font-size:1.45rem;font-weight:800;letter-spacing:.03em;margin-bottom:.2rem;color:#ffd75e}
  .muted{color:#7d87a3;font-size:.9rem;font-weight:400}
+ select{max-width:100%}
  select,button{font-size:1rem;padding:.45rem .8rem;margin:.2rem .3rem .2rem 0;
       border:1px solid #2b3a5e;border-radius:8px;background:#111a30;color:#e8e6df;cursor:pointer}
  button.primary{background:#0d1526;color:#ffd75e;border:1px solid #ffd75e;
@@ -723,6 +729,7 @@ just speak when it's your turn.</div>
   <option value="listen">Full Read Through</option>
   <option value="mine">My Lines Only (read to you)</option>
  </select>
+ <select id="startat" title="where in this set to start"></select>
  <label id="voxwrap" style="display:none;font-size:.85rem;color:#9aa4c0">
   <input type="checkbox" id="voxchk" checked> &#127908; Real voices</label>
  <button class="primary" id="startbtn">&#127821; Start</button>
@@ -1295,10 +1302,12 @@ function showGap(g){
 // has learned lines the old way for years) ----
 // A first-learning pass: every one of the actor's lines read aloud in
 // order, and between them a beat where someone else speaks, never their
-// words. The beat is the name of whoever speaks last before the line,
-// said in that character's voice, then any sound cue that falls there
-// (the doorbell before "Security"). Nothing is asked of the actor, so no
-// mic is opened and nothing is judged: it can run in a pocket or a car.
+// words. The beat is one soft tap (beat(), below), then any sound cue that
+// falls there (the doorbell before "Security"). It was the name of whoever
+// speaks last before the line, said aloud; he took the words out
+// 2026-11-19 ("anything is better than more words and the names"). The
+// name still shows on the screen. Nothing is asked of the actor, so no mic
+// is opened and nothing is judged: it can run in a pocket or a car.
 function showMine(l,who,bell,now){
  const av=who&&DATA.avatars&&DATA.avatars[who]||"";
  const myAv=(DATA.avatars&&DATA.avatars[NAME])||"";
@@ -1322,8 +1331,8 @@ function playMine(l,t){
  const ring=n=>{if(!live())return;
   if(n>=bells.length){setTimeout(line,250);return;}
   setTimeout(()=>ring(n+1),playSfx(bells[n])||300);};
- if(who)ttsSpeak(who.charAt(0)+who.slice(1).toLowerCase(),1.1,who,()=>ring(0));
- else setTimeout(()=>ring(0),400);
+ // A breath, the tap, then whatever sounds fall there, then the line.
+ setTimeout(()=>{if(live())setTimeout(()=>ring(0),beat()||300);},350);
 }
 function playGap(l,k,t,auto){
  if(t!==token||!running||paused)return;
@@ -1561,7 +1570,7 @@ function showReport(what){
  stage.querySelectorAll(".rgo").forEach(a=>{a.onclick=()=>start(currentSet(),+a.dataset.k);});
  // The next pick is only chosen; they press Start themselves.
  const nb=document.getElementById("rnextbtn");
- if(nb)nb.onclick=()=>{scope.value=nx.value;stage.innerHTML="";whereEl.textContent="";
+ if(nb)nb.onclick=()=>{scope.value=nx.value;buildStartAt();stage.innerHTML="";whereEl.textContent="";
   my.textContent="\\u{1F34D} Press Start to run this selection.";
   try{window.scrollTo(0,0);}catch(_){/**/}};
 }
@@ -1573,7 +1582,7 @@ function step(){
    :v.startsWith("run:")?"Scene complete!":"That's the whole play!";
   showReport(what);
   whereEl.textContent="";my.textContent="";stop();
-  document.getElementById("runbackbtn").onclick=()=>start(currentSet());
+  document.getElementById("runbackbtn").onclick=()=>start(currentSet(),startKey());
   return;}
  const t=++token;
  const l=DATA.lines[queue[pos]];heard="";kept="";simArmed=false;
@@ -1609,6 +1618,22 @@ function loadChime(){
  try{const s=atob(CHIME_MP3),a=new Uint8Array(s.length);
   for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);
   AC.decodeAudioData(a.buffer,b=>{chimeBuf=b;},()=>{});}catch(_){/**/}
+}
+// The beat of My Lines Only: a second short mp3, carried and played the
+// same way. Answers how long to wait for it, 0 if it could not play.
+const BEAT_MP3="__BEAT__";
+let beatBuf=null;
+function loadBeat(){
+ if(beatBuf||!AC)return;
+ try{const s=atob(BEAT_MP3),a=new Uint8Array(s.length);
+  for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);
+  AC.decodeAudioData(a.buffer,b=>{beatBuf=b;},()=>{});}catch(_){/**/}
+}
+function beat(){
+ if(!AC||!beatBuf)return 0;
+ try{const s=AC.createBufferSource(),g=AC.createGain();
+  g.gain.value=.7;s.buffer=beatBuf;
+  s.connect(g).connect(AC.destination);s.start();mlog("beat");return 520;}catch(_){return 0;}
 }
 function chime(){
  if(!AC||!chimeBuf)return;
@@ -1794,7 +1819,7 @@ function start(q,at){
  // engine and the speech engine here, while this IS a real tap.
  if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();
  if(AC.state==="suspended")AC.resume();
- loadChime();
+ loadChime();loadBeat();
  try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u);}catch(_){/**/}
  if(HOLDASK&&mode.value!=="mine")holdMic();
  SESS.runs++;SESS.mode=mode.value;SESS.scope=TEST?"test:"+TEST.id:scope.value;
@@ -1830,15 +1855,35 @@ document.addEventListener("visibilitychange",()=>{
   // The OS drops the wake lock whenever the tab hides; take it back.
   lockWake();
   if(paused&&autoPaused){autoPaused=false;resume();}}});
-startbtn.onclick=()=>start(currentSet());
+// ---- pick a starting point (Chris, 2026-11-19) ----
+// A third menu: start the chosen set at any of its lines instead of the
+// top. It lists the set's lines by number, page and first words, follows
+// the scene menu, and is put away for the shuffled quiz, where "from line
+// 4" means nothing. Picking a line during a run goes there at once. A run
+// started part way is not a full run: it sets no best (RUN.part).
+const startat=document.getElementById("startat");
+function buildStartAt(){
+ const set=TEST?[]:currentSet();
+ startat.innerHTML="";
+ const add=(v,t)=>{const o=document.createElement("option");o.value=v;o.textContent=t;startat.appendChild(o);};
+ add("","Start at the top");
+ set.forEach((k,n)=>{if(!n)return;const l=DATA.lines[k];
+  add(String(k),"Start at line "+(n+1)+(l.page?" \\u00b7 p. "+l.page:"")+" \\u00b7 "
+   +(l.say.length>34?l.say.slice(0,32)+"\\u2026":l.say));});
+ startat.style.display=TEST||mode.value==="quiz"||set.length<2?"none":"";
+}
+const startKey=()=>startat.value===""||mode.value==="quiz"?undefined:+startat.value;
+buildStartAt();
+startat.onchange=()=>{if(running)start(currentSet(),startKey());};
+startbtn.onclick=()=>start(currentSet(),startKey());
 // Changing the scene or mode mid-run: the queue was built at Start, so
 // the old run would keep playing ("stuck on whatever the line is").
 // Halt cleanly and hand back the pineapple, aimed at the new pick.
 function halt(){token++;hush();judging=false;paused=false;
  stop();stage.innerHTML="";whereEl.textContent="";
  my.textContent="\\u{1F34D} Press Start to run this selection.";}
-scope.onchange=()=>{if(running)halt();};
-mode.onchange=()=>{if(running)halt();};
+scope.onchange=()=>{buildStartAt();if(running)halt();};
+mode.onchange=()=>{buildStartAt();if(running)halt();};
 // Pause must actually kill the run in flight: bump the token so every
 // pending timer and speech callback goes stale, silence the voice, and
 // release the mic. Without the token bump, cancelling the speech fires
@@ -2731,6 +2776,7 @@ def build_play(cfg, outdir):
                 .replace("__BUILD__", build)
                 .replace("__SCRIPT__", script_name)
                 .replace("__CHIME__", chime_b64())
+                .replace("__BEAT__", chime_b64(BEAT))
                 .replace("__DATA__", json.dumps(data, ensure_ascii=False)))
         path = os.path.join(outdir,
                             cfg["prefix"] + name.replace(" ", "_") + ".html")

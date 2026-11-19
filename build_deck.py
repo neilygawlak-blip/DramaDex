@@ -47,7 +47,7 @@ import re
 import shutil
 import sys
 
-from build_character_pages import READ_TEMPLATE, TEMPLATE, chime_b64
+from build_character_pages import BEAT, READ_TEMPLATE, TEMPLATE, chime_b64
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DECK = os.path.join(HERE, "private", "deck")
@@ -153,6 +153,7 @@ def product(t, kind, demo=False, sync=False):
         cut("const TESTS=__TESTS__;", "const TESTS={};")
         cut('const SCRIPT_URL="__SCRIPT__";', 'const SCRIPT_URL="data:,";')
         cut('const CHIME_MP3="__CHIME__"', 'const CHIME_MP3="%s"' % chime_b64())
+        cut('const BEAT_MP3="__BEAT__"', 'const BEAT_MP3="%s"' % chime_b64(BEAT))
     # Build stamp: meaningless for an imported play.
     sub(r'\s*<div id="build">[^<]*</div>', "")
     # The back button walks the app's own router instead of a URL.
@@ -194,7 +195,8 @@ def product(t, kind, demo=False, sync=False):
     t = re.sub(r"(<script>)(.*?)(</script>)", strip_notes, t, flags=re.S)
 
     for bad in ("voices/manifest.json", "reportbtn", "Tell Neil", "mailto:", "nexustechfl",
-                "__HOME__", "__TESTS__", "__SCRIPT__", "__CHIME__", "__YEARTAG__", "Chris,"):
+                "__HOME__", "__TESTS__", "__SCRIPT__", "__CHIME__", "__BEAT__", "__YEARTAG__",
+                "Chris,"):
         assert bad not in t, "left in the %s page: %s" % (kind, bad)
     return t
 

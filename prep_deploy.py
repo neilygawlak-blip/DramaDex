@@ -207,8 +207,10 @@ line in rehearsal. Arrow keys skip around.</p>
 everyone else and waits for you; or <b>Listen through</b> the whole
 thing in your car.</p>
 <p>First learning them? <b>My Lines Only</b> reads just your lines, in
-order, and names who speaks before each one. Nothing to say back; just
-listen.</p>
+order, with a soft tone where someone else speaks. Nothing to say back;
+just listen.</p>
+<p>Want to begin part way in? The third menu, <b>Start at the top</b>,
+lets you pick any line of the scene to start from.</p>
 <div class="hfhead">Hands-Free Mode - Voice Commands</div>
 <div class="hfrow">
  <div class="hfbox"><b>&ldquo;Next word&rdquo;</b>Says the next word of
