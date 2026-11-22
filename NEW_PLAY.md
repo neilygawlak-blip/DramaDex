@@ -219,3 +219,62 @@ was new, in the order it bit:
    carries them and nothing is edited by hand in the TSV. And a stray
    fragment on the OCR line of a hidden word ("is," for "this, he") is not a
    missing word: check whether the next page opens mid-sentence first.
+
+---
+
+## What the fourth play taught (The 39 Steps, 2026-11-22)
+
+The first play to arrive as a PDF with its own text layer (a scan of the
+Samuel French edition, 105 pages, Acrobat's OCR underneath), and the first
+written for actors who each play many parts. Everything lives in
+`private/the_39_steps/`. It went from the PDF to the live site in one sitting,
+and none of Phases 0-1 was needed. What was new:
+
+1. **A PDF's text layer comes with positions, and the positions are the
+   structure.** PyMuPDF gives every line its left edge, and on a Samuel French
+   page that says what the line is: a speech opens at the margin with the name,
+   everything else sits one step in, a direction opens with a parenthesis. So
+   speeches are built from where lines sit, not from guessing at paragraph
+   breaks, and there is no fix table: `assemble.py` goes straight from printed
+   lines to speeches. The PDF's page N was printed page N, so every paragraph
+   has its real page on file and the site shows it (the estimate the other
+   plays use was up to four pages out on this book).
+2. **Correct the printed LINES, then build.** `line_fixes.tsv` holds one row
+   per printed line that the OCR got wrong (805 of 2,976), keyed by page and
+   line. The reader's eye and the picture share the same line breaks, so a
+   correction is easy to make and easy to check, and the speeches are rebuilt
+   from the corrected lines every time. `check_assembly.py` then proves every
+   printed line is in the speeches, in order, with nothing added; `deploy.cmd`
+   stops if it fails.
+3. **Two reads, then eyes, then eyes again.** The text layer and a second,
+   independent OCR (Windows, on 220 dpi pictures of the pages) disagreed on a
+   third of the lines, and the second one caught two lines the first had
+   dropped whole. Both went, side by side, beside enlarged half-page pictures
+   to a proofread of every line; a second proofread of the corrected text, by
+   different readers with the pages dealt out differently and no hints, found
+   nothing left to change. A streak down one scan and the italic directions
+   were where the first read was worst, as on Communicating Doors.
+4. **A direction in the middle of a speech stays in the speech.** Plain words
+   after a direction, with no new name, are the same speaker going on, so they
+   stay in his paragraph; only the directions after his last words become
+   paragraphs of their own. That is the defect fixed by hand in Communicating
+   Doors on 2026-11-22, and here it cannot happen.
+5. **The print's own oddities are kept, and its name variants are filed
+   together.** Misprints and dialect stay as printed. A character printed under
+   two names keeps one page (`ALIAS` in `assemble.py`), a joint speech becomes
+   one speech per speaker marked `(together)` (`JOINT`), and the adapter's
+   footnotes are kept beside the text, not in it.
+6. **A page can be an actor, not a name.** The two Clowns speak under twenty-six
+   names between them, three in a minute at one point, so a page per name
+   would be useless to them. A play with a `tracks` file
+   (`PAGE NAME = NAME, NAME, ...`) gets one page per actor: his lines in the
+   order he says them, each marked with the character he is at that moment,
+   cues still voiced and badged as the character who gives them. The book's
+   own directions say who plays what almost everywhere; the tracks file lists
+   the evidence and the few it does not settle. Recasting is an edit to that
+   one file.
+7. **The play's own headings need telling apart from speech.** Scene headings
+   are plain lines with no name, which the parser would stitch onto the speech
+   before them; a play can now give a `heading` pattern.
+
+Per-play settings added to the registry: `heading`, `tracks`, `pages`.

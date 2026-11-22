@@ -305,6 +305,109 @@ CD_SFX = [
 ]
 
 
+# The 39 Steps (Patrick Barlow, Samuel French). The book is written for four
+# actors, and the two Clowns between them speak under twenty-six names, so the
+# practice pages are one per ACTOR (private/the_39_steps/tracks_the_39_steps.txt)
+# and these tables are one per printed name: a cue is voiced and badged as the
+# character who says it.
+S39_AVATARS = {
+    "HANNAY":     "\U0001F3C3\U0001F5FA\ufe0f",   # on the run, with the enormous map
+    "ANNABELLA":  "\U0001F52B\U0001F5A4",          # the spy in black, the gun in her handbag
+    "PAMELA":     "\U0001F453\u26d3\ufe0f",       # her glasses, and the handcuffs
+    "MARGARET":   "\U0001F41F\U0001F56F\ufe0f",   # the herring supper in the crofter's cottage
+    "COMPERE":    "\U0001F3A4\U0001F3A9",          # music hall, evening dress
+    "MR MEMORY":  "\U0001F9E0\U0001F3AD",          # fifty new facts a day
+    "MILKMAN":    "\U0001F95B\U0001F9E2",          # his cap and coat
+    "MRS HIGGINS": "\U0001F9F9\U0001F631",         # the charlady and her scream
+    "SALESMAN 1": "\U0001F4BC1\ufe0f\u20e3",      # the samples case
+    "SALESMAN 2": "\U0001F4BC2\ufe0f\u20e3",
+    "PAPERBOY":   "\U0001F4F0\U0001F9E2",          # evening paper, flat cap
+    "POLICEMAN":  "\U0001F46E\U0001F682",          # the constable on the platform
+    "PORTER":     "\U0001F682\U0001F4E3",          # all aboard
+    "POLICEMAN 1": "\U0001F46E1\ufe0f\u20e3",
+    "POLICEMAN 2": "\U0001F46E2\ufe0f\u20e3",
+    "RADIO ANNOUNCER": "\U0001F4FB\U0001F399\ufe0f",
+    "CROFTER":    "\U0001F404\U0001F3DA\ufe0f",   # the coos and the miserable cottage
+    "PILOT 1":    "\u2708\ufe0f1\ufe0f\u20e3",
+    "PILOT 2":    "\u2708\ufe0f2\ufe0f\u20e3",
+    "MRS JORDAN": "\U0001F452\U0001F378",          # tweeds and the cocktail party
+    "VOICE":      "\U0001F5E3\ufe0f",              # the Professor, before he is seen
+    "PROFESSOR":  "\U0001F6AC\U0001F393",          # the black cigarette holder
+    "SHERIFF":    "\u2b50\U0001F36A",              # the sheriff and his biscuits
+    "INSPECTOR":  "\U0001F6A8\U0001F46E",          # the chief inspector with the handcuffs
+    "DUNWOODY":   "\U0001F4E3\U0001F474",          # master of ceremonies
+    "MCQUARRIE":  "\U0001F474\U0001F4DC",          # the inaudible chairman
+    "HEAVY 1":    "\U0001F574\ufe0f1\ufe0f\u20e3",   # trilby and trench-coat
+    "HEAVY 2":    "\U0001F574\ufe0f2\ufe0f\u20e3",
+    "MRS MCGARRIGLE": "\U0001F3E8\U0001F475",      # the hotel, a warm welcome
+    "MR MCGARRIGLE":  "\U0001F3E8\U0001F474",
+    "ANNOUNCER":  "\U0001F3AD\U0001F4E2",          # this is the London Palladium
+    "ALBRIGHT":   "\U0001F575\ufe0f\U0001F6A8",   # New Scotland Yard
+    # the actors' pages
+    "ANNABELLA PAMELA MARGARET": "\U0001F3AD\U0001F457",
+    "CLOWN 1":    "\U0001F3AD1\ufe0f\u20e3",
+    "CLOWN 2":    "\U0001F3AD2\ufe0f\u20e3",
+    "FULL READ THROUGH": "\U0001F3A7\U0001F4D6",
+}
+
+# Everyone is British or Scottish ("proper" asks for a British voice); the
+# quick-change turns go a little faster. Defaults until Chris casts the voices.
+_S39_M = {"g": "m", "style": "proper", "mult": 1.0}
+S39_VOICES = {
+    "HANNAY":     dict(_S39_M),
+    "ANNABELLA":  {"g": "f", "style": "proper", "mult": 0.95},
+    "PAMELA":     {"g": "f", "style": "proper", "mult": 1.05},
+    "MARGARET":   {"g": "f", "style": "proper", "mult": 0.95},
+    "COMPERE":    dict(_S39_M, mult=1.1),
+    "MR MEMORY":  dict(_S39_M, mult=1.1),
+    "MILKMAN":    dict(_S39_M, mult=1.1),
+    "MRS HIGGINS": {"g": "f", "style": "proper", "mult": 1.1},
+    "SALESMAN 1": dict(_S39_M, mult=1.15),
+    "SALESMAN 2": dict(_S39_M, mult=1.15),
+    "PAPERBOY":   dict(_S39_M, mult=1.2),
+    "POLICEMAN":  dict(_S39_M, mult=1.1),
+    "PORTER":     dict(_S39_M, mult=1.2),
+    "POLICEMAN 1": dict(_S39_M, mult=1.1),
+    "POLICEMAN 2": dict(_S39_M, mult=1.1),
+    "RADIO ANNOUNCER": dict(_S39_M),
+    "CROFTER":    dict(_S39_M, mult=0.9),
+    "PILOT 1":    dict(_S39_M, mult=1.2),
+    "PILOT 2":    dict(_S39_M, mult=1.2),
+    "MRS JORDAN": {"g": "f", "style": "proper", "mult": 0.95},
+    "VOICE":      dict(_S39_M, mult=0.95),
+    "PROFESSOR":  dict(_S39_M, mult=0.95),
+    "SHERIFF":    dict(_S39_M, mult=1.05),
+    "INSPECTOR":  dict(_S39_M, mult=1.1),
+    "DUNWOODY":   dict(_S39_M, mult=1.05),
+    "MCQUARRIE":  dict(_S39_M, mult=0.9),
+    "HEAVY 1":    dict(_S39_M, mult=1.1),
+    "HEAVY 2":    dict(_S39_M, mult=1.1),
+    "MRS MCGARRIGLE": {"g": "f", "style": "proper", "mult": 1.1},
+    "MR MCGARRIGLE":  dict(_S39_M),
+    "ANNOUNCER":  dict(_S39_M),
+    "ALBRIGHT":   dict(_S39_M),
+    "ANNABELLA PAMELA MARGARET": {"g": "f", "style": "proper", "mult": 1.0},
+    "CLOWN 1":    dict(_S39_M),
+    "CLOWN 2":    dict(_S39_M),
+}
+
+# Cues as the directions print them, case kept so talk about a telephone or a
+# shot never fires one. Gunfire plays as the bump, as it does in Doors.
+S39_SFX = [
+    ("phone", re.compile(r"Telephone rings|The phone rings")),
+    ("doorbell", re.compile(r"Avon chimes")),
+    ("bump", re.compile(r"Knock knock|Shoots into the air|He fires directly|"
+                        r"Shoots MEMORY|A shot rings out|machine gun fire")),
+    ("crash", re.compile(r"deafening crash|Plane explodes")),
+    ("slam", re.compile(r"slams it behind him")),
+    ("scream", re.compile(r"PAMELA screams")),
+]
+# The book's own headings between the acts' speeches. Without this a heading
+# reads as the tail of the speech before it and is stitched onto it.
+S39_HEADING = re.compile(r"(Overture|Scene [A-Z][a-z]+([ -][A-Z][a-z]+)?\s*[:.]|"
+                         r"End of Act|The End)")
+
+
 # What the recognizer WRITES when a script word is said right. A name is
 # not wording: the phone hears "Harold Palmer" as "Harold bomber" (Chris,
 # iPhone, 2026-11-10), and no spelling or sound rule joins those two. One
@@ -434,7 +537,55 @@ PLAYS = {
         "back_matter": ("END OF PLAY",), "no_page": set(),
         "avatars": CD_AVATARS, "voices": CD_VOICES, "sfx": CD_SFX,
     },
+    "steps": {
+        "title": "The 39 Steps",
+        "author": "Patrick Barlow, from the novel by John Buchan",
+        "raw": "private/the_39_steps/the_39_steps_fixed.txt",
+        "cast": "private/the_39_steps/cast_the_39_steps.txt",
+        "prefix": "S39_", "home": "the_39_steps.html",
+        "acts": 2,
+        # Printed pages (the PDF's page N is printed page N): Act One runs
+        # p.9 to p.59, Act Two p.61 to The End on p.105.
+        "act_pages": {"Act I": (9, 59), "Act II": (61, 105)},
+        "back_matter": (), "no_page": set(),
+        "heading": S39_HEADING,
+        # One page per actor, not per printed name: who plays whom.
+        "tracks": "private/the_39_steps/tracks_the_39_steps.txt",
+        # The printed page of every paragraph (assemble.py writes it).
+        "pages": "private/the_39_steps/the_39_steps_raw_pages.txt",
+        "avatars": S39_AVATARS, "voices": S39_VOICES, "sfx": S39_SFX,
+    },
 }
+
+
+def load_tracks(cfg, cast):
+    """The play's practice pages as [(page name, [printed names])].
+
+    Most plays have one page per printed name. A play with a "tracks" file
+    (PAGE NAME = NAME, NAME, ...) has one page per ACTOR instead: The 39
+    Steps' Clowns speak under a dozen names each, sometimes three in a
+    minute, and their lines only make sense in the order one man says them.
+    """
+    if not cfg.get("tracks"):
+        return [(n, [n]) for n in cast if n not in cfg["no_page"]]
+    pages, seen = [], {}
+    for k, line in enumerate(open(cfg["tracks"], encoding="utf-8-sig"), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            sys.exit("%s line %d: expected PAGE NAME = NAME, NAME" % (cfg["tracks"], k))
+        page, names = line.split("=", 1)
+        names = [x.strip() for x in names.split(",") if x.strip()]
+        for x in names:
+            if x not in cast:
+                sys.exit("%s line %d: %r is not in the cast list" % (cfg["tracks"], k, x))
+            if x in seen:
+                sys.exit("%s line %d: %r is already on the page %r"
+                         % (cfg["tracks"], k, x, seen[x]))
+            seen[x] = page.strip()
+        pages.append((page.strip(), names))
+    return pages
 
 
 def year_tag(cfg):
@@ -465,7 +616,8 @@ def parse(rawfile, cast, cfg=None):
                               sorted(cast, key=len, reverse=True)))
     text = open(rawfile, encoding="utf-8").read()
     act, speeches = "Front matter", []
-    for p in (q.strip() for q in text.split("\n\n") if q.strip()):
+    paras = [q.strip() for q in text.split("\n\n") if q.strip()]
+    for k, p in enumerate(paras):
         m = ACT_RE.match(p)
         if m:
             act = ACTS[m.group(1)]
@@ -476,6 +628,10 @@ def parse(rawfile, cast, cfg=None):
             act = "Act I"
         if any(p.startswith(b) for b in cfg["back_matter"]):
             break
+        if cfg.get("heading") and cfg["heading"].match(p):
+            speeches.append({"act": act, "speaker": None, "text": p,
+                             "say": "", "sfx": None, "k": k})
+            continue
         m = speech_re.match(p)
         sfx = next((n for n, rx in cfg["sfx"] if rx.search(p)), None)
         # A paragraph with no name that is not a direction or a heading is
@@ -500,8 +656,22 @@ def parse(rawfile, cast, cfg=None):
             "text": p,
             "say": spoken(p, m.group(1)) if m else "",
             "sfx": sfx,
+            "k": k,
         })
     number_pages(speeches, cfg["act_pages"])
+    # A play whose every paragraph has its printed page on file (The 39
+    # Steps, taken from a PDF) uses the real page. The guess above is kept
+    # if the file and the text ever stop agreeing on how many paragraphs
+    # there are, which a fix that adds or removes a paragraph will do.
+    if cfg.get("pages") and os.path.exists(cfg["pages"]):
+        real = [int(l.split("page ")[1])
+                for l in open(cfg["pages"], encoding="utf-8") if "page " in l]
+        if len(real) == len(paras):
+            for s in speeches:
+                s["page"] = real[s["k"]]
+        else:
+            print("  %s: %d pages for %d paragraphs, pages estimated instead"
+                  % (cfg["pages"], len(real), len(paras)))
     tag_together(speeches)
     return speeches
 
@@ -527,9 +697,10 @@ def runs_for(speeches, name):
     the lot was labelled Act II, which read as fifteen Act II lines he
     does not have.
     """
+    mine = {name} if isinstance(name, str) else set(name)
     runs, current, last_i = [], [], None
     for i, s in enumerate(speeches):
-        if s["speaker"] != name or not s["say"]:
+        if s["speaker"] not in mine or not s["say"]:
             continue
         if current and (i - last_i > RUN_GAP
                         or s["act"] != speeches[current[0]]["act"]):
@@ -750,6 +921,10 @@ just speak when it's your turn.</div>
 <script>
 const DATA=__DATA__;
 const NAME="__NAME__";
+// A page can be one actor's several characters (The 39 Steps' Clowns). Then
+// each line names the character it is said as, and DATA.mine lists them all.
+const whoOf=l=>(l&&l.who)||NAME;
+const MINE=new Set(DATA.mine||[NAME]);
 // ---- test links: <page>.html#test=<name> (tests.json) ----
 const TESTS=__TESTS__;
 const TESTM=/test=([a-z0-9]+)/.exec(location.hash);
@@ -1102,7 +1277,7 @@ function ttsSpeak(t,pace,who,done,again){if(!t){done();return;}const u=new Speec
 function show(l,auto){
  const c=l.cue;
  const av=c.speaker&&DATA.avatars&&DATA.avatars[c.speaker]||"";
- const myAv=(DATA.avatars&&DATA.avatars[NAME])||"";
+ const myAv=(DATA.avatars&&DATA.avatars[whoOf(l)])||"";
  const words=norm(l.say).split(" ").filter(w=>w);
  const mine=auto?esc(l.say)
   :words.map(w=>'<span class="pending">'+esc(w)+'</span>').join(" ");
@@ -1121,7 +1296,7 @@ function show(l,auto){
   (c.speaker?'<span class="cuename">'+av+" "+c.speaker+'.</span> ':"")+esc(c.say)+
   '<button id="ctxbtn">Full Script</button></div>'+
   '<div id="ctx"></div>'+
-  '<div class="mine"><span class="cuename">'+myAv+" "+NAME+'.</span> <span id="diff">'+mine+'</span>'+
+  '<div class="mine"><span class="cuename">'+myAv+" "+whoOf(l)+'.</span> <span id="diff">'+mine+'</span>'+
   (l.sim?'<span class="simchip">\\u{1F5E3} Speak along with them</span>':"")+'</div>'+
   simRows+
   '<div id="verdict"></div>'+
@@ -1148,14 +1323,14 @@ function show(l,auto){
   const fromScript=S=>{const cur=DATA.lines[queue[pos]];let h="";
    S.forEach(e=>{if(e.h){h+='<div class="fshead">'+esc(e.h)+'</div>';return;}
     let t=e.t;if(e.s&&t.toUpperCase().startsWith(e.s.toUpperCase()))t=t.slice(e.s.length);
-    h+='<div class="fsline'+(e.s===NAME?" fsmine":"")+(e.s?"":" fsdir")
+    h+='<div class="fsline'+(MINE.has(e.s)?" fsmine":"")+(e.s?"":" fsdir")
      +(cur&&e.i===cur.i?" fsnow":"")+'">'+(e.s?'<b>'+esc(e.s)+'</b>':"")+esc(t)+'</div>';});
    return h;};
   const fromGaps=()=>{let h="";
    queue.forEach((qi,k)=>{const L=DATA.lines[qi];
     (L.gap||[]).forEach(g=>{h+='<div class="fsline">'+
      (g.t?'<b>'+esc(g.s)+'.</b> '+esc(g.t):"\\u{1F514} (sound)")+"</div>";});
-    h+='<div class="fsline fsmine'+(k===pos?" fsnow":"")+'"><b>'+esc(NAME)+'.</b> '+esc(L.say)+'</div>';
+    h+='<div class="fsline fsmine'+(k===pos?" fsnow":"")+'"><b>'+esc(whoOf(L))+'.</b> '+esc(L.say)+'</div>';
     (L.sim||[]).forEach(p=>{h+='<div class="fsline"><b>'+esc(p.s)+'.</b> '
      +esc(p.t)+' <i>(together)</i></div>';});});
    return h;};
@@ -1283,7 +1458,7 @@ function startSim(l){
 function myTurn(l,t,auto){
  if(t!==token||!running)return;
  show(l,auto);
- if(auto){speak(l.say,1.3,NAME,()=>{if(t===token&&running&&!paused)
+ if(auto){speak(l.say,1.3,whoOf(l),()=>{if(t===token&&running&&!paused)
    setTimeout(()=>{if(t===token&&running&&!paused){pos++;step();}},500);},l.l);
   startSim(l);}
  else{judging=true;noteListen();if(rec&&rec.listen)rec.listen();
@@ -1310,10 +1485,10 @@ function showGap(g){
 // is opened and nothing is judged: it can run in a pocket or a car.
 function showMine(l,who,bell,now){
  const av=who&&DATA.avatars&&DATA.avatars[who]||"";
- const myAv=(DATA.avatars&&DATA.avatars[NAME])||"";
+ const myAv=(DATA.avatars&&DATA.avatars[whoOf(l)])||"";
  stage.innerHTML='<div class="cue">'+(bell?"\\u{1F514} ":"")+
   (who?'<span class="cuename">'+av+" "+who+'.</span>':"")+'</div>'+
-  (now?'<div class="mine"><span class="cuename">'+myAv+" "+NAME+'.</span> '+esc(l.say)+'</div>':"");
+  (now?'<div class="mine"><span class="cuename">'+myAv+" "+whoOf(l)+'.</span> '+esc(l.say)+'</div>':"");
 }
 function playMine(l,t){
  if(t!==token||!running||paused)return;
@@ -1327,7 +1502,7 @@ function playMine(l,t){
  if(!bells.length&&l.cue.sfx)bells.push(l.cue.sfx);
  showMine(l,who,bells.length,false);
  const line=()=>{if(!live())return;showMine(l,who,bells.length,true);
-  speak(l.say,1.3,NAME,()=>{if(live())setTimeout(()=>{if(live()){pos++;step();}},500);},l.l);};
+  speak(l.say,1.3,whoOf(l),()=>{if(live())setTimeout(()=>{if(live()){pos++;step();}},500);},l.l);};
  const ring=n=>{if(!live())return;
   if(n>=bells.length){setTimeout(line,250);return;}
   setTimeout(()=>ring(n+1),playSfx(bells[n])||300);};
@@ -1964,7 +2139,7 @@ function readAloud(l,theirs){
  // A breath between cancel and the speak, or Chrome eats the speak.
  setTimeout(()=>{if(t!==token||!running||paused)return;
   if(theirs)speak(l.cue.say,l.cue.pace,l.cue.speaker,after,l.cue.l);
-  else speak(l.say,1.3,NAME,after,l.l);},Math.max(150,wait));
+  else speak(l.say,1.3,whoOf(l),after,l.l);},Math.max(150,wait));
 }
 // "next word" said aloud: the page SAYS the word as well as showing it
 // (Chris, 2026-11-12: hands free means they cannot look at it either). The
@@ -2717,12 +2892,10 @@ def build_play(cfg, outdir):
     print("== %s — by %s == (%d loose words get bounded leeway)"
           % (cfg["title"], cfg["author"], len(loose)))
 
-    for name in cast:
-        if name in cfg["no_page"]:
-            continue
+    for name, members in load_tracks(cfg, cast):
         lines, prev = [], -1
         for i, s in enumerate(speeches):
-            if s["speaker"] == name and s["say"]:
+            if s["speaker"] in members and s["say"]:
                 # Everything between their last line and this one: the talk
                 # and the noises they stand through on stage. Structured so
                 # Full Scene mode can perform it, voice by voice.
@@ -2741,13 +2914,16 @@ def build_play(cfg, outdir):
                         gap.append({"s": "", "t": "", "m": NEUTRAL,
                                     "p": 1.3, "x": g["sfx"]})
                 body = s["text"]
-                if body.upper().startswith(name.upper()):
-                    body = body[len(name):]
+                if body.upper().startswith(s["speaker"].upper()):
+                    body = body[len(s["speaker"]):]
                 rec = {"i": i, "act": s["act"], "say": s["say"],
                        "tx": body.lstrip(" .:").strip(),
-                       "l": line_id(name, s["say"]),
+                       "l": line_id(s["speaker"], s["say"]),
                        "page": s.get("page", 0),
                        "cue": cue_for(speeches, i), "gap": gap}
+                if len(members) > 1:
+                    # one actor, several characters: the line says which
+                    rec["who"] = s["speaker"]
                 if s.get("gid"):
                     rec["sim"] = [
                         {"s": g["speaker"], "t": g["say"],
@@ -2759,10 +2935,12 @@ def build_play(cfg, outdir):
                 prev = i
         if not lines:
             continue
-        runs = runs_for(speeches, name)
+        runs = runs_for(speeches, members)
         data = {"lines": lines, "runs": runs, "voices": cfg["voices"],
                 "avatars": cfg["avatars"], "loose": loose,
                 "alias": HEARD_AS}
+        if len(members) > 1:
+            data["mine"] = members
         build = datetime.datetime.now().strftime("%b %d, %I:%M %p")
         stem = cfg["prefix"] + name.replace(" ", "_")
         html = (TEMPLATE

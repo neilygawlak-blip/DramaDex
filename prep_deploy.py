@@ -12,10 +12,11 @@ Usage:
 
 import json
 import os
+import re
 import shutil
 import sys
 
-from build_character_pages import PLAYS, TESTS
+from build_character_pages import PLAYS, TESTS, load_tracks
 
 INDEX = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
@@ -497,6 +498,22 @@ def tests_page():
     return TESTPAGE.replace("__CARDS__", body).replace("__BUILD__", build)
 
 
+def page_parts(cfg):
+    """{page: [printed names]} where a page is one actor's several characters
+    (The 39 Steps' Clowns); empty for a play with one page per name."""
+    if not cfg.get("tracks"):
+        return {}
+    cast = [l.strip() for l in open(cfg["cast"], encoding="utf-8-sig")
+            if l.strip()]
+    return {p: m for p, m in load_tracks(cfg, cast) if len(m) > 1}
+
+
+def nice(name):
+    """MRS MCGARRIGLE -> Mrs McGarrigle."""
+    return re.sub(r"\bMc([a-z])", lambda m: "Mc" + m.group(1).upper(),
+                  name.title())
+
+
 def main():
     if len(sys.argv) != 3:
         sys.exit(__doc__)
@@ -516,7 +533,7 @@ def main():
     # One cast page per play; the front page chooses between them. A
     # play's files are picked out by its prefix, so the prefixless play
     # (SHTR, whose URLs predate the chooser) claims what's left.
-    order = ["doors", "intermission", "shtr"]
+    order = ["doors", "steps", "intermission", "shtr"]
     other_prefixes = [PLAYS[k]["prefix"] for k in order if PLAYS[k]["prefix"]]
     playlinks, npages = [], 0
     for key in order:
@@ -526,10 +543,17 @@ def main():
                 if (f.startswith(pre) if pre
                     else not any(f.startswith(p) for p in other_prefixes))]
         links = []
+        parts = page_parts(cfg)
         for f in mine:
             stem = f[len(pre):-5].replace("_", " ")
             badge = cfg["avatars"].get(stem, "")
-            links.append('<a href="%s">%s %s</a>' % (f, badge, stem.title()))
+            # An actor's page lists the characters on it under its name.
+            who = ('<small style="display:block;color:#7d87a3;font-size:.8rem;'
+                   'line-height:1.4">%s</small>'
+                   % ", ".join(nice(n) for n in parts[stem])
+                   if stem in parts and stem != " ".join(parts[stem]) else "")
+            links.append('<a href="%s">%s %s%s</a>'
+                         % (f, badge, stem.title(), who))
         # The read-through leads with its act shortcuts, then a rule,
         # then the cast alphabetically.
         links.sort(key=lambda l: "FULL_READ_THROUGH" not in l)
@@ -560,8 +584,10 @@ def main():
     # The Voice Booth, its upload worker, and any voices already rendered
     # by Neil's Lab. Cast list comes from AVATARS so even the CHOIRBOY
     # (no practice page, but his lines cue people) can leave a voice.
+    # (An actor's page is not a character: it is left off the booth's list.)
     booth_cast = {PLAYS[k]["title"]: sorted(
-        n for n in PLAYS[k]["avatars"] if n != "FULL READ THROUGH")
+        n for n in PLAYS[k]["avatars"]
+        if n != "FULL READ THROUGH" and n not in page_parts(PLAYS[k]))
         for k in order}
     with open(os.path.join(dst, "voice_booth.html"), "w",
               encoding="utf-8") as fh:
