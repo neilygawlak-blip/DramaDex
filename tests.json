@@ -7,7 +7,7 @@
   "device": "Windows PC, Chrome, AirPods connected",
   "mode": "drill",
   "knobs": "",
-  "lines": [903, 905, 911, 915, 917, 920, 924, 926],
+  "lines": [900, 902, 908, 912, 914, 917, 921, 923],
   "steps": [
    "Connect your AirPods to the PC, then press Start.",
    "Say each of the 8 lines as it comes up.",
@@ -23,7 +23,7 @@
   "device": "iPhone, AirPods connected",
   "mode": "drill",
   "knobs": "",
-  "lines": [911, 915, 917, 920, 928, 934],
+  "lines": [908, 912, 914, 917, 925, 931],
   "steps": [
    "Connect your AirPods to the iPhone, then press Start.",
    "On every line: say the first few words, say \"next word\", wait for the word, then say it and carry on.",
@@ -38,7 +38,7 @@
   "device": "iPhone, AirPods connected",
   "mode": "drill",
   "knobs": "-hold",
-  "lines": [903, 905, 911, 915, 917, 920, 924, 926],
+  "lines": [900, 902, 908, 912, 914, 917, 921, 923],
   "steps": [
    "Do this one after the Next word test. Connect your AirPods, then press Start.",
    "Say each of the 8 lines as it comes up, as you normally would.",
@@ -53,7 +53,7 @@
   "device": "iPhone, set up the way it was when the pause bothered you",
   "mode": "drill",
   "knobs": "",
-  "lines": [862, 864, 873, 890, 899, 905, 939, 944, 950, 957],
+  "lines": [859, 861, 870, 887, 896, 902, 936, 941, 947, 954],
   "steps": [
    "Press Start. There are 10 short lines.",
    "Say each line at your normal pace, starting as soon as the cue ends.",
