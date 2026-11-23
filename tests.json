@@ -60,5 +60,21 @@
    "Each time a wait feels long, tap Mark this moment right after it.",
    "At the end, write in the box whether the wait came before you could speak or after you finished, and whether AirPods were in. Then tap a result."
   ]
+ },
+
+ "doorbellios": {
+  "page": "CD_HAROLD",
+  "title": "Lines after a doorbell, and the one-word shout",
+  "device": "iPhone, the way you normally practise",
+  "mode": "drill",
+  "knobs": "",
+  "lines": [1245, 1256, 1322],
+  "steps": [
+   "Press Start. There are 3 lines.",
+   "Lines 1 and 3 come after a doorbell. New: after the chime a voice says the word Doorbell. Wait for it, then say your line as normal.",
+   "Line 2 ends on the one-word shout. If it will not pass, say that last word slowly three more times, then tap Got it.",
+   "Any time a line will not pass, tap Mark this moment before you move on.",
+   "At the end, tap It worked if lines 1 and 3 both passed by voice, or It went wrong if either did not."
+  ]
  }
 }

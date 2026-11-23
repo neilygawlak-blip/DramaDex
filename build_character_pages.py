@@ -1222,6 +1222,21 @@ const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)
 // (and any clip that fails to load) goes to the browser voice. A real
 // voice plays exactly as rendered: the farce-pace speed-uppers belong to
 // the robot voices, not to a human.
+// A cue that is only a sound (the doorbell before "his" line) has no voice,
+// and an iPhone's ears open deaf unless a voice has only just spoken (iosEars,
+// below: the silent phrase said in a cue's place does not wake them). Chris,
+// 2026-11-23: a line after a doorbell "never works on the app on my iphone";
+// his session notes had every such line on the iPhone at nothing heard, 0 of
+// 6 by voice after 10 to 33 seconds of listening, beside 98% for lines cued
+// by a voice and 12 of 13 for the same lines on the PC. So with the iPhone's
+// ears the sound is named aloud once it has played, and that voice is the
+// phrase the ears open on, exactly as they do after any spoken cue. Nowhere
+// else: the PC's ears never needed it.
+const SOUNDWORD={doorbell:"Doorbell.",phone:"Telephone.",bell:"Bell.",crash:"Crash.",
+ church:"Church bells.",slam:"Door slam.",bump:"Bang.",scream:"Scream.",
+ voices:"Voices.",gasp:"Gasp.",sing:"Singing."};
+function cueSaid(text,sfx){
+ return text||(sfx&&rec&&rec.listen?(SOUNDWORD[sfx]||"Sound."):"");}
 function speak(t,pace,who,done,lid){
  if(!t){done();return;}
  if(lid&&who&&voxchk.checked&&VOX.has(who+"/"+lid)){
@@ -1517,7 +1532,7 @@ function playGap(l,k,t,auto){
  showGap(g);
  const wait=playSfx(g.x);
  setTimeout(()=>{if(t!==token||!running||paused)return;
-  speak(g.t,g.p,g.s,()=>playGap(l,k+1,t,auto),g.l);},wait);
+  speak(!auto&&k===gap.length-1?cueSaid(g.t,g.x):g.t,g.p,g.s,()=>playGap(l,k+1,t,auto),g.l);},wait);
 }
 // ---- the run report (Chris, 2026-11-17) ----
 // When a run ends, beside Run It Back: how it went, and which lines to work
@@ -1769,7 +1784,7 @@ function step(){
   show(l,false);
   const wait=playSfx(l.cue.sfx);
   setTimeout(()=>{if(t!==token||!running||paused)return;
-   speak(l.cue.say,l.cue.pace,l.cue.speaker,()=>{if(t!==token||!running||paused)return;
+   speak(cueSaid(l.cue.say,l.cue.sfx),l.cue.pace,l.cue.speaker,()=>{if(t!==token||!running||paused)return;
     judging=true;noteListen();if(rec&&rec.listen)rec.listen();
     if(rec)simArmed=!!(l.sim&&l.sim.length);else startSim(l);
     my.textContent=rec?"":"No mic here: say it out loud anyway, then \\u25B6";},l.cue.l);},wait);
@@ -2138,7 +2153,7 @@ function readAloud(l,theirs){
  const wait=theirs?playSfx(l.cue.sfx):0;
  // A breath between cancel and the speak, or Chrome eats the speak.
  setTimeout(()=>{if(t!==token||!running||paused)return;
-  if(theirs)speak(l.cue.say,l.cue.pace,l.cue.speaker,after,l.cue.l);
+  if(theirs)speak(cueSaid(l.cue.say,l.cue.sfx),l.cue.pace,l.cue.speaker,after,l.cue.l);
   else speak(l.say,1.3,whoOf(l),after,l.l);},Math.max(150,wait));
 }
 // "next word" said aloud: the page SAYS the word as well as showing it
